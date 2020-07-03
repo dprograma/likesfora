@@ -40,7 +40,7 @@
     </ul>
   </nav>
   <!-- second navigation after the top bar -->
-  <nav class="navbar navbar-expand-lg navbar-dark secondnav sticky-top" style="background-color:black;">
+  <nav class="navbar navbar-expand-lg navbar-dark secondnav" style="background-color:black;position:sticky;">
     <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
       <span class="navbar-toggler-icon"></span>
     </button>
@@ -87,7 +87,7 @@
     <div class="row" style="margin: auto;">
       <!--add a carousel -->
       <div class="col-md-8 col-12 carouselwrapper">
-        <div id="carouselExampleCaptions" class="carousel slide carousel-fade" data-ride="carousel">
+        <div id="carouselExampleCaptions" class="carousel slide carousel-fade d-block d-md-block" data-ride="carousel">
           <ol class="carousel-indicators">
             <li data-target="#carouselExampleCaptions" data-slide-to="0" class="active"></li>
             <li data-target="#carouselExampleCaptions" data-slide-to="1"></li>
@@ -306,9 +306,9 @@
                 <a class="dropdown-item" href="#"><i class="fas fa-bell mr-2"></i>Turn On Notification For This Post.<p class="pl-4"></p></a>
                 <a class="dropdown-item" href="#"><i class="fas fa-code mr-2"></i>Embed<p class="pl-4"></p></a>
                 <div class="dropdown-divider"></div>
-                <a class="dropdown-item" href="#"><i class="fas fa-times-rectangle mr-2"></i>Hide Your Post<p class="pl-4"><small>See less of this type of post.</small></p></a>
+                <a class="dropdown-item" href="#"><i class="fas fa-times-circle mr-2"></i>Hide Your Post<p class="pl-4"><small>See less of this type of post.</small></p></a>
                 <a class="dropdown-item" href="#"><i class="fas fa-clock mr-2"></i>Snooze Profile Name for 15 Days<p class="pl-4"><small>Temporarily Stop Seeing This Post.</small></p></a>
-                <a class="dropdown-item" href="#"><i class="fas fa-remove mr-2"></i>Unfollow Profile name<p class="pl-4"><small>Stop Seeing This Post But Remain Friends.</small></p></a>
+                <a class="dropdown-item" href="#"><i class="fas fa-times mr-2"></i>Unfollow Profile name<p class="pl-4"><small>Stop Seeing This Post But Remain Friends.</small></p></a>
                 <a class="dropdown-item" href="#"><i class="fas fa-minus-square mr-2"></i>Report This Post<p class="pl-4"><small>I Have My Concerns About This Post.</small></p></a>
               </div>
             </li>
@@ -350,15 +350,15 @@
           <ul class="nav nav-tabs-custom imgpos">
             <li class="nav-item dropdown">
               <a class="nav-link" data-toggle="dropdown" href="#" role="tab" aria-haspopup="true" aria-expanded="false"><img src="assets/images/caretdown2.png" alt="see more" class="dwcaret"></a>
-              <div class="dropdown-menu customshadow dropdown-menu-right">
+              <div class="dropdown-menu customshadow dropdown-menu-right reverse">
                 <a class="dropdown-item" href="#"><i class="fas fa-bookmark mr-2"></i>Save Your Post<p class="pl-4"><small>Add this to your saved items.</small></p></a>
                 <div class="dropdown-divider"></div>
                 <a class="dropdown-item" href="#"><i class="fas fa-bell mr-2"></i>Turn On Notification For This Post.<p class="pl-4"></p></a>
                 <a class="dropdown-item" href="#"><i class="fas fa-code mr-2"></i>Embed<p class="pl-4"></p></a>
                 <div class="dropdown-divider"></div>
-                <a class="dropdown-item" href="#"><i class="fas fa-times-rectangle mr-2"></i>Hide Your Post<p class="pl-4"><small>See less of this type of post.</small></p></a>
+                <a class="dropdown-item" href="#"><i class="fas fa-times-circle mr-2"></i>Hide Your Post<p class="pl-4"><small>See less of this type of post.</small></p></a>
                 <a class="dropdown-item" href="#"><i class="fas fa-clock mr-2"></i>Snooze Profile Name for 15 Days<p class="pl-4"><small>Temporarily Stop Seeing This Post.</small></p></a>
-                <a class="dropdown-item" href="#"><i class="fas fa-remove mr-2"></i>Unfollow Profile name<p class="pl-4"><small>Stop Seeing This Post But Remain Friends.</small></p></a>
+                <a class="dropdown-item" href="#"><i class="fas fa-times mr-2"></i>Unfollow Profile name<p class="pl-4"><small>Stop Seeing This Post But Remain Friends.</small></p></a>
                 <a class="dropdown-item" href="#"><i class="fas fa-minus-square mr-2"></i>Report This Post<p class="pl-4"><small>I Have My Concerns About This Post.</small></p></a>
               </div>
             </li>

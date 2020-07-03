@@ -63,3 +63,8 @@ hr {
   background-color: rgb(247, 243, 243);
 }
 
+.nav-tabs .nav-link {
+  border: transparent;
+  border-top-left-radius: 0.25rem;
+  border-top-right-radius: 0.25rem;
+}
