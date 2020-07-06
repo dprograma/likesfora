@@ -7161,6 +7161,16 @@ a.text-dark:hover, a.text-dark:focus {
     color: inherit;
     border-color: #dee2e6; } }
 
+* {
+  padding: 0;
+  margin: 0;
+  border: 0; }
+
+body {
+  padding: 0;
+  margin: 0;
+  border: 0; }
+
 .logo {
   width: 150px;
   height: 40px; }
@@ -7181,9 +7191,21 @@ a.text-dark:hover, a.text-dark:focus {
   border-top-color: transparent; }
 
 .bgoverlay {
-  background-image: linear-gradient(to bottom, rgba(245, 246, 252, 0.52), rgba(117, 19, 93, 0.73)), url("assets/images/frontimage.png");
+  background-image: linear-gradient(to bottom, rgba(245, 246, 252, 0.52), rgba(117, 19, 93, 0.73)), url("../images/frontimage.png");
   background-size: cover;
-  height: 687px; }
+  background-position: center center;
+  background-repeat: no-repeat;
+  background-attachment: fixed; }
+
+.likeforamoto {
+  font-size: 3rem;
+  font-family: Verdana, Geneva, Tahoma, sans-serif;
+  color: thistle; }
+
+.likesforatext {
+  font-size: 1.25rem;
+  font-family: Verdana, Geneva, Tahoma, sans-serif;
+  color: thistle; }
 
 .secondnav {
   position: absolute;
@@ -7331,7 +7353,13 @@ a.text-dark:hover, a.text-dark:focus {
   .imgpos {
     left: 75%; }
   .ddown {
-    font-size: 13px; } }
+    font-size: 13px; }
+  .likeforamoto {
+    font-size: 2rem;
+    text-align: center; }
+  .likesforatext {
+    font-size: 1.25rem;
+    text-align: center; } }
 
 .col-md-4 {
   padding-right: 8px !important;
@@ -7396,3 +7424,8 @@ hr {
   border: transparent;
   border-top-left-radius: 0.25rem;
   border-top-right-radius: 0.25rem; }
+
+.my-5-custom {
+  margin-top: 4rem !important;
+  margin-right: 2rem !important;
+  margin-left: 2rem !important; }

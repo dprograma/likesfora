@@ -14,14 +14,16 @@
 
 <body class="bgoverlay">
     <!-- top nav bar for login page -->
-    <nav class="navbar navbar-expand-lg navbar-dark sticky-top topbar">
+    <nav class="navbar navbar-expand-lg navbar-light sticky-top topbar">
+        <a class="navbar-brand" href="#">
+            <img src="assets/images/logo.png" alt="Likesfora Logo" class="logo">
+        </a>
         <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
         </button>
 
         <div class="collapse navbar-collapse" id="navbarSupportedContent">
             <div class="mr-auto">
-                <img src="assets/images/logo.png" alt="Likesfora Logo" class="logo">
             </div>
             <div class="form-group has-search my-2 my-lg-0 ml-auto">
                 <button class="btn btn-outline-success my-2 my-sm-0" type="submit">Sign Up</button>
@@ -31,16 +33,17 @@
     </nav>
     <!-- main body -->
     <div class="container-fluid">
-        <div class="row">
-            <div class="col-md-7 d-none d-md-block">
-                <div style="margin-top:250px; margin-left:100px;">
-                    <p class="font-weight-bolder" style="font-size:3rem;font-family: Verdana, Geneva, Tahoma, sans-serif;">Designed for friendship that pays.</p>
+        <div class="row h-100">
+            <div class="col-md-7 w-75 my-auto mx-auto pt-5">
+                <div class="w-75 mx-auto">
+                    <p class="font-weight-bolder likeforamoto">Designed for friendship that pays.</p>
 
-                    <p style="font-size:1.25rem;font-family: Verdana, Geneva, Tahoma, sans-serif;">LikesFora is a social platform developed for people who want to do more on a social network.</p>
+                    <p class="likesforatext">LikesFora is a social platform developed for people who want to do more on a social network.</p>
                 </div>
             </div>
             <div class="col-md-5 col-12">
-                <div class="card p-4" style="margin-top: 100px; margin-right: 100px; z-index: 100000;">
+                <div class="row h-100">
+                <div class="card p-4 my-5 mx-auto w-75">
                     <form action="">
                         <div class="form-group">
                             <label for="username">Username</label>
@@ -59,12 +62,13 @@
                         </div>
                     </form>
                 </div>
+                </div>
             </div>
         </div>
         <!-- Row to display the footer section -->
         <div class="row">
-            <div class="mx-auto mt-5 pt-4">
-                <p>By clicking “Sign up for LikesFora”, you agree to our <a href="#">Terms and Conditons</a> and <a href="#">Privacy Policy</a>. We’ll occasionally send you account related emails.</p>
+            <div class="mx-auto mt-5 pt-4 h-25">
+                <p style="font-family: Verdana, Geneva, Tahoma, sans-serif; font-size:13px; font-weight:bold;color:thistle; text-align: center;">By clicking “Sign up for LikesFora”, you agree to our <a href="#">Terms and Conditons</a> and <a href="#">Privacy Policy.</a></p>
             </div>
         </div>
     </div>
