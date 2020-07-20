@@ -1,4 +1,5 @@
-var jquery = require('jquery');
+window.jQuery = require('jquery');
+window.$  = global.jQuery;
 var bootstrap = require('bootstrap');
-var fontawesome = require('./node_modules/fontawesome/js/fontawesome.js');
+var script = require('./assets/js/script');
 
