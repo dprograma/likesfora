@@ -39,30 +39,19 @@ class Destroy
         }
     }
 
-    public function signout($url)
+    public function signout($table, $url)
     {
-        mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
         //connect to mysqli database
-        $mysqli = new mysqli('localhost', 'root', '', 'handyman_8791');
-        //obtain session
-        session_start();
-        $email = $_SESSION['email'];
-        $password = $_SESSION['password'];
-        $loggedin = $_SESSION['loggedin'];
+        include "../config/config.php";
     
         //remove logged in value from database
         $log = 0;
-        $session = "";
-        $sql = $mysqli->prepare("UPDATE migrationTable SET `loggedin` = ?, `sessionid` = ? WHERE `email` = ?");
-        $sql->bind_param('iss', $log, $session, $email);
+        $sql = $mysqli->prepare("UPDATE " . $table . " SET `loggedin` = ? WHERE `email` = ?");
+        $sql->bind_param('is', $log, $email);
         $sql->execute();
-        //unset current session id
-        session_unset($_SESSION['email']);
-        unset($_SESSION['email']);
-        session_unset($_SESSION['password']);
-        unset($_SESSION['password']);
-        session_unset($_SESSION['loggedin']);
-        unset($_SESSION['loggedin']);
+        //unset current session
+        session_unset();
+        session_destroy();
 
         header("location:$url");
     }

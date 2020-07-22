@@ -48,6 +48,7 @@ class Signup
             if ($stmt->affected_rows > 0) {
                 $stmt->close();
                 $registered = 1;
+                $loggedin = 1;
                 $sql = "UPDATE " . $table . " SET `registered` = ? WHERE `email` = ? AND `password` = ?";
                 $stmt = $mysqli->prepare($sql);
                 $stmt->bind_param('iss', $registered, $email, $password);
@@ -73,8 +74,8 @@ class Signup
                 $message = "<p style='text-align: center;'><img src='http://localhost/likesfora/assets/images/logo.png' style='width:120px; height: 30px;'></p>";
                 $message .= "<p style='text-align: center;'><strong>Welcome to LikesFora, " . $firstname . "</strong></p>";
                 $message .= "<p style='text-align: center;'> Please, click the button below to confirm your email. </p>";
-                $message .= "<p style='text-align: center;'><a href='$url?verify=$verify' style='position: static; margin-left: auto; margin-right: auto; display: block; width: 180px; height: 80px; background-color: #4e80ca; color: #fff; border-radius: 5px; font-size: 22px; text-decoration: none; text-align: center; line-height: 80px; font-weight: bold;'>Confirm</a></p><p style='text-align:center;'>OR</p>";
-                $message .= "<p style='text-align: center;'><a href='$url?verify=$verify'>" . $url . "?verify=" . $verify . "</a></p>";
+                $message .= "<p style='text-align: center;'><a href='$url?action=confirm&verify=$verify' style='position: static; margin-left: auto; margin-right: auto; display: block; width: 180px; height: 80px; background-color: #4e80ca; color: #fff; border-radius: 5px; font-size: 22px; text-decoration: none; text-align: center; line-height: 80px; font-weight: bold;'>Confirm</a></p><p style='text-align:center;'>OR</p>";
+                $message .= "<p style='text-align: center;'><a href='$url?action=confirm&verify=$verify'>" . $url . "/" . $verify . "</a></p>";
                 $message .= "<p></p>";
                 $message .= "<p style='font-size: 20px; text-decoration: underline; text-align: center;'>Disclaimer</p>";
                 $message .= "<p style='font-size: 12px; color: #3f444a;'>This message has been sent as a part of discussion between you and the addressee whose name is specified above. Should you receive this message by mistake, we would be most grateful if you informed us that the message has been sent to you. In this case, we also ask that you delete this message from your mailbox, and do not forward it or any part of it to anyone else. Thank you for your cooperation and understanding.</p>";

@@ -1,14 +1,6 @@
-  <?php include "../view/partials/__header.php";
-
-  if (!isset($_REQUEST['csrf_token'])) {
-    $_REQUEST['csrf_token'] = '';
-  }
-
-  if (!isset($_REQUEST['verify'])) {
-    $_REQUEST['verify'] = '';
-  }
-  if (hash_equals($_SESSION['csrf_token'], $_REQUEST['csrf_token']) || hash_equals($_SESSION['verify'], $_REQUEST['verify'])) {
-
+  <?php
+  include "../view/partials/__header.php";
+  if ($loggedin == 1 || $registered == 1) {
   ?>
     <!DOCTYPE html>
     <html>
@@ -23,17 +15,17 @@
         <ul class="nav nav-tabs">
           <img src="../assets/images/logo.png" alt="LikesFora logo" class="logo">
           <li class="nav-item dropdown ml-auto list">
-            <a class="nav-link dropdown-toggle" data-toggle="dropdown" href="#" role="button" aria-haspopup="true" aria-expanded="false" style="color: #3c3c3c; font-family: Arial, Helvetica, sans-serif;font-size: 13px;background-color: #f8f9fa;"><?php echo "Hi, " . $firstname; ?>
+            <a class="nav-link dropdown-toggle" data-toggle="dropdown" href="#" role="button" aria-haspopup="true" aria-expanded="false" style="color: #3c3c3c; font-family: Arial, Helvetica, sans-serif;font-size: 13px;background-color: #f8f9fa;"><?php echo "Hi, " . ucfirst($firstname); ?>
               <img src="../assets/images/story1.jpg" alt="user profile" class="profileimage">
             </a>
             <div class="dropdown-menu">
               <a class="dropdown-item" href="#"><i class="fas fa-tachometer-alt mr-2"></i> Timeline<p class="ml-4"><small><em>See your timeline.</em></small></p></a>
               <div class="dropdown-divider"></div>
-              <a class="dropdown-item" href="#"><i class="fas fa-user-circle mr-2"></i> <?php echo $firstname . " " . $lastname; ?><p class="ml-4"><small><em>Your profile.</em></small></p></a>
+              <a class="dropdown-item" href="#"><i class="fas fa-user-circle mr-2"></i> <?php echo ucfirst($firstname) . " " . ucfirst($lastname); ?><p class="ml-4"><small><em>Your profile.</em></small></p></a>
               <div class="dropdown-divider"></div>
               <a class="dropdown-item" href="#"><i class="fas fa-cog mr-2"></i> Settings<p></p></a>
               <a class="dropdown-item" href="#"><i class="fas fa-question-circle mr-2"></i> Help and Support<p></p></a>
-              <a class="dropdown-item" href="#"><i class="fas fa-sign-out-alt mr-2"></i> Logout<p></p></a>
+              <a class="dropdown-item" href="../controllers/usercontroller.php?action=logout"><i class="fas fa-sign-out-alt mr-2"></i> Logout<p></p></a>
             </div>
           </li>
         </ul>
@@ -555,7 +547,6 @@
 
     </html>
   <?php
-
-  }else{
-    echo "Request not available!";
+  } else {
+    echo "Invalid request!";
   }
