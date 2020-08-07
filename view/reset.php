@@ -1,9 +1,10 @@
-<?php include "../view/partials/__header.php"; ?>
+<?php 
+include "../view/partials/__header.php"; 
+?>
 <!DOCTYPE html>
 <html lang="en">
 <?php $title = "Password reset";
 include "../view/partials/__head.php"; ?>
-
 <body>
     <?php include "../view/partials/__nav1.php"; ?>
     <div class="container">

@@ -36,17 +36,24 @@ class Signin
                 $stmp->bind_param('ss', $email, $password);
                 $stmp->execute();
                 //retrieve all user details from database
-                $stmp->bind_result($userid,$e_mail,$pwd,$firstname,$lastname,$username,$phone,$loggedin,$registered);
-                $stmp->fetch();
+                // $stmp->bind_result($userid,$e_mail,$pwd,$firstname,$lastname,$username,$phone,$loggedin,$registered);
+                // $stmp->fetch();
+                $result = $stmp->get_result();
+                $row = $result->fetch_assoc();
                 
-                $_SESSION['userid'] = $userid;
-                $_SESSION['email'] = $e_mail;
-                $_SESSION['password'] = $pwd;
-                $_SESSION['firstname'] = $firstname;
-                $_SESSION['lastname'] = $lastname;
-                $_SESSION['phone'] = $phone;
-                $_SESSION['loggedin'] = $loggedin;
-                $_SESSION['registered'] = $registered;
+                $_SESSION['userid'] = $row['userId'];
+                $_SESSION['email'] = $row['email'];
+                $_SESSION['password'] = $row['password'];
+                $_SESSION['firstname'] = $row['firstname'];
+                $_SESSION['lastname'] = $row['lastname'];
+                $_SESSION['phone'] = $row['phone'];
+                $_SESSION['loggedin'] = $row['loggedin'];
+                $_SESSION['registered'] = $row['registered'];
+                $_SESSION['description'] = $row['description'];
+                $_SESSION['bio'] = $row['bio'];
+                $_SESSION['coverimage'] = $row['coverimage'];
+                $_SESSION['profileimage'] = $row['profileimage'];
+
 
                 header("location:$url");
                 $stmt->close();

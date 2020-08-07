@@ -1,0 +1,1 @@
+<?php $directory = "C:/xampp/htdocs/likesfora/"; ?>

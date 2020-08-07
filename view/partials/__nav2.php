@@ -4,12 +4,10 @@
   <img src="../assets/images/logo.png" alt="LikesFora logo" class="logo">
   <li class="nav-item dropdown ml-auto list">
     <a class="nav-link dropdown-toggle" data-toggle="dropdown" href="#" role="button" aria-haspopup="true" aria-expanded="false" style="color: #3c3c3c; font-family: Arial, Helvetica, sans-serif;font-size: 13px;background-color: #f8f9fa;"><?php echo "Hi, " . ucfirst($firstname); ?>
-      <img src="../assets/images/story1.jpg" alt="user profile" class="profileimage">
+      <img src="../assets/images/profile/<?php echo $profileimage; ?>" alt="user profile" class="profileimage">
     </a>
     <div class="dropdown-menu">
-      <a class="dropdown-item" href="#"><i class="fas fa-tachometer-alt mr-2"></i> Timeline<p class="ml-4"><small><em>See your timeline.</em></small></p></a>
-      <div class="dropdown-divider"></div>
-      <a class="dropdown-item" href="#"><i class="fas fa-user-circle mr-2"></i> <?php echo ucfirst($firstname) . " " . ucfirst($lastname); ?><p class="ml-4"><small><em>Your profile.</em></small></p></a>
+      <a class="dropdown-item" href="http://localhost/likesfora/view/user.php"><img src="../assets/images/profile/<?php echo $profileimage; ?>" alt="user profile" class="profileimage"> <strong><?php echo ucfirst($firstname) . " " . ucfirst($lastname); ?></strong><p class="ml-4"><small><em>Your profile.</em></small></p></a>
       <div class="dropdown-divider"></div>
       <a class="dropdown-item" href="#"><i class="fas fa-cog mr-2"></i> Settings<p></p></a>
       <a class="dropdown-item" href="#"><i class="fas fa-question-circle mr-2"></i> Help and Support<p></p></a>
@@ -27,7 +25,7 @@
 <div class="collapse navbar-collapse" id="navbarSupportedContent">
   <ul class="navbar-nav mx-auto text-white-50">
     <li class="nav-item active">
-      <a class="nav-link" href="#"><i class="fas fa-home"></i> Home <span class="sr-only">(current)</span></a>
+      <a class="nav-link" href="http://localhost/likesfora/view/home.php"><i class="fas fa-home"></i> Home <span class="sr-only">(current)</span></a>
     </li>
     <li class="nav-item">
       <a class="nav-link" href="#"><i class="fas fa-users"></i> Group</a>

@@ -37,7 +37,7 @@ class Reset
             $_SESSION['password'] = $row['password'];
             //create email credentials
             $url = $url . "?action=reset&email_token=" . $token;
-            $message = "<p style='text-align: center;'><img src='http://localhost/likesfora/assets/images/logo.png' style='width:120px; height: 30px;'></p>";
+            $message = "<p style='text-align: center;'><img src='{$directory}assets/images/logo.png' style='width:120px; height: 30px;'></p>";
             $message .= "<p style='text-align: center;'><strong>Hello,</strong></p>";
             $message .= "<p style='text-align: center;'> Please, click the button below to reset your password. </p>";
             $message .= "<p style='text-align: center;'><a href='$url' style='position: static; margin-left: auto; margin-right: auto; display: block; width: 180px; height: 80px; background-color: #4e80ca; color: #fff; border-radius: 5px; font-size: 22px; text-decoration: none; text-align: center; line-height: 80px; font-weight: bold;'>Reset</a></p><p style='text-align:center;'>OR</p>";

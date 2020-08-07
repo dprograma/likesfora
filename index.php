@@ -7,11 +7,12 @@ include "view/partials/__header.php";
 <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <title>LikesFora | Friendship that pays ?></title>
+    <title>LikesFora | Friendship that pays</title>
     <meta name="description" content="">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="assets/css/app.css">
     <link rel="stylesheet" href="assets/fonts/font.css">
+    <link rel="stylesheet" href="assets/css/styles.css">
     <script type="text/javascript" src="assets/js/app.js"></script>
     <script>
         function userlogin() {

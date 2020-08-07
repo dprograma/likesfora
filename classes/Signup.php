@@ -71,7 +71,7 @@ class Signup
                 $mobile = $row['phone'];
                 $log = $row['loggedin'];
                 $reg = $row['registered'];
-                $message = "<p style='text-align: center;'><img src='http://localhost/likesfora/assets/images/logo.png' style='width:120px; height: 30px;'></p>";
+                $message = "<p style='text-align: center;'><img src='{$directory}assets/images/logo.png' style='width:120px; height: 30px;'></p>";
                 $message .= "<p style='text-align: center;'><strong>Welcome to LikesFora, " . $firstname . "</strong></p>";
                 $message .= "<p style='text-align: center;'> Please, click the button below to confirm your email. </p>";
                 $message .= "<p style='text-align: center;'><a href='$url?action=confirm&verify=$verify' style='position: static; margin-left: auto; margin-right: auto; display: block; width: 180px; height: 80px; background-color: #4e80ca; color: #fff; border-radius: 5px; font-size: 22px; text-decoration: none; text-align: center; line-height: 80px; font-weight: bold;'>Confirm</a></p><p style='text-align:center;'>OR</p>";
