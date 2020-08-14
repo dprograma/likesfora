@@ -6,7 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="../assets/css/app.css">
     <link rel="stylesheet" href="../assets/fonts/font.css">
-    <link rel="stylesheet" href="../assets/css/styles.css">
     <script type="text/javascript" src="../assets/js/app.js"></script>
     <script>
         function userlogin() {

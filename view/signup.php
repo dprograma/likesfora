@@ -2,7 +2,10 @@
 <!DOCTYPE html>
 <html>
 
-<?php include "../view/partials/__head.php"; ?>
+<?php
+$title = "Registration page";
+include "../view/partials/__head.php"; 
+?>
 
 <body class="bgoverlay">
     <!-- top nav bar for login page -->
@@ -34,21 +37,36 @@
                                 <label for="lastname">Lastname</label>
                                 <input type="text" name="lastname" id="lastname" class="form-control form-control-sm" required>
                             </div>
+                            <div class="row form-group">
+                                <div class="col-md-6 col-12">
+                                    <label for="gender">Gender</label>
+                                    <select name="gender" id="gender" class="form-control" required>
+                                        <option value="Male" selected>Male</option>
+                                        <option value="Female">Female</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 col-12">
+                                    <label for="dob">Date of Birth</label>
+                                    <input type="date" name="dob" id="dob" class="form-control" required>
+                                </div>
+                            </div>
                             <div class="form-group">
                                 <label for="email">Email</label>
-                                <input type="text" name="email" id="email" class="form-control form-control-sm" required>
+                                <input type="email" name="email" id="email" class="form-control form-control-sm" required>
                             </div>
                             <div class="form-group">
                                 <label for="phone">Phone</label>
-                                <input type="text" name="phone" id="phone" class="form-control form-control-sm" required>
+                                <input type="tel" pattern="[0-9]{11}" name="phone" id="phone" class="form-control form-control-sm" required>
                             </div>
-                            <div class="form-group">
-                                <label for="password">Password</label>
-                                <input type="password" name="password" id="password" class="form-control form-control-sm" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="confirm">Confirm</label>
-                                <input type="password" name="confirm" id="confirm" class="form-control form-control-sm" required>
+                            <div class="row form-group">
+                                <div class="col-md-6 col-12">
+                                    <label for="password">Password</label>
+                                    <input type="password" name="password" id="password" class="form-control form-control-sm" required>
+                                </div>
+                                <div class="col-md-6 col-12">
+                                    <label for="confirm">Confirm</label>
+                                    <input type="password" name="confirm" id="confirm" class="form-control form-control-sm" required>
+                                </div>
                             </div>
                             <div class="form-group">
                                 <input type="submit" name="action" id="action" class="btn btn-success btn-block" value="Sign Up For LikesFora">

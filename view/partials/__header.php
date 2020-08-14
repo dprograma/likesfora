@@ -33,6 +33,8 @@ while ($row = $result->fetch_assoc()) {
     $_SESSION['registered'] = $row['registered'];
 }
 
+$stmt->close();
+
 //retrieve all values from users table
 $sql = "SELECT DISTINCT address, location, education, work FROM userbackground WHERE `userid` = ? ORDER BY `id` ASC";
 $stmt = $mysqli->prepare($sql);
@@ -46,6 +48,29 @@ while ($row = $result->fetch_assoc()) {
     $_SESSION['work'] = $row['work'];
 }
 
+$stmt->close();
+
+$stmt = $mysqli->query("SELECT count(*) as `count` FROM notifications WHERE `userid` = '$userid'");
+$noofrows = $stmt->fetch_assoc()['count'];
+
+$stmt = $mysqli->query("SELECT `lastnoofrows` FROM notifications WHERE `userid` = '$userid'");
+$row = $stmt->fetch_assoc();
+$lastnoofrows = $row['lastnoofrows'];
+
+$notification = $noofrows - $lastnoofrows;
+
+if (basename($_SERVER['SCRIPT_NAME']) == 'notifications.php') {
+    $mysqli->query("UPDATE notifications SET `lastnoofrows` = '$noofrows' WHERE `userid` = '$userid'");
+
+    $stmt = $mysqli->query("SELECT `lastnoofrows` FROM notifications WHERE `userid` = '$userid'");
+    $row = $stmt->fetch_assoc();
+    $lastnoofrows = $row['lastnoofrows'];
+}
+
+$notification = $noofrows - $lastnoofrows;
+
+$stms = $mysqli->query("SELECT DISTINCT `friendsid` FROM friends WHERE `userid` = '$userid'");
+$friends = $stms->num_rows;
 
 isset($_SESSION['firstname']) ? $firstname = $_SESSION['firstname'] : $firstname = '';
 isset($_SESSION['lastname']) ? $lastname = $_SESSION['lastname'] : $lastname = '';

@@ -13,7 +13,7 @@ class Signup
     public $from;
     public $list = [];
 
-    public function create($table, $firstname, $url, $redirectUrl, $subject, $from, $password, $confirm, $email,  $list)
+    public function create($table, $firstname, $url, $redirectUrl, $subject, $from, $password, $confirm, $email, $list)
     {
         //connect to mysqli database
         include "../config/config.php";
@@ -30,12 +30,15 @@ class Signup
             header("location:$redirectUrl");
         } elseif ($password != $confirm) {              //check if password
             $_SESSION['error'] = "Password mismatch!";
-            header("location:$redirectUrl"); //is same as re-enter
-            $stmt->close();                                     //password
-        } else {
+            header("location:$redirectUrl"); //is same as re-enter password
+        } elseif(strlen($confirm < 6)){ //ensure password length is min 6 length
+            $_SESSION['error'] = "Invalid password!";
+            header("location:$redirectUrl"); 
+            $stmt->close();             
+        }else {
             $stmt->close();
             //if all goes well
-            $sql = "INSERT IGNORE INTO " . $table . " (userId,email,password,firstname,lastname,username,phone) VALUES(";
+            $sql = "INSERT IGNORE INTO " . $table . " (userId,email,password,firstname,lastname,dob,sex,phone) VALUES(";
             foreach ($list as $l) {                            //insert into 
                 $values[] = "'$l'";                       //database
             }

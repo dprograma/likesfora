@@ -7230,7 +7230,7 @@ hr {
   margin-right: 2rem !important;
   margin-left: 2rem !important; }
 
-/* * {
+* {
   padding: 0px;
   margin: 0px;
   border: 0px; }
@@ -7239,9 +7239,6 @@ body {
   padding: 0px;
   margin: 0px;
   border: 0px; }
-
-.workbg {
-  display: none; }
 
 .logo {
   width: 150px;
@@ -7263,7 +7260,7 @@ body {
   border-top-color: transparent; }
 
 .bgoverlay {
-  background-image: linear-gradient(to bottom, rgba(245, 246, 252, 0.52), rgba(117, 19, 93, 0.73)), url("../images/frontimage.png");
+  background-image: linear-gradient(to bottom, rgba(245, 246, 252, 0.52), rgba(196, 77, 166, 0.729)), url("../images/frontimage.png");
   background-size: cover;
   background-position: center center;
   background-repeat: no-repeat;
@@ -7354,8 +7351,7 @@ body {
 .friendboard {
   font-size: 12px;
   margin-bottom: 2px;
-  font-family: "Lucida Sans", "Lucida Sans Regular", "Lucida Grande", "Lucida Sans Unicode",
- "Geneva, Verdana, sans-serif"; }
+  font-family: "Lucida Sans", "Lucida Sans Regular", "Lucida Grande", "Lucida Sans Unicode", "Geneva, Verdana, sans-serif"; }
 
 .indicatortext {
   font-size: 10px;
@@ -7464,15 +7460,15 @@ body {
   position: fixed;
   display: none;
   /* color with alpha channel */
-  /*background-color: rgba(0, 0, 0, 0.7);
+  background-color: rgba(0, 0, 0, 0.7);
   /* 0.7 = 70% opacity */
   /* stretch to screen edges */
-  /*top: 0px;
+  top: 0px;
   left: 0px;
   bottom: 0px;
   right: 0px; }
 
-/* .popup {
+.popup {
   position: relative;
   display: none;
   z-index: 100000000000000000;
@@ -7532,6 +7528,40 @@ body {
 .workbg {
   display: none; }
 
+.academbg {
+  display: none; }
+
+.noticeicons {
+  position: fixed;
+  display: block;
+  min-width: 18px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  margin: 0 auto;
+  overflow: hidden;
+  line-height: 17px;
+  padding-left: 4px;
+  padding-right: 4px;
+  padding-top: 2px;
+  padding-bottom: 2px;
+  background-color: red;
+  color: #fff;
+  transform: translate(15px, -8px); }
+
+.dspmore {
+  font-size: 0.75rem;
+  color: rgba(117, 19, 93, 0.73); }
+
+.successdiv {
+  display: none;
+  min-width: 50px;
+  height: auto;
+  padding: 4px;
+  font-size: 11px;
+  color: #063f14;
+  background-color: #a4f8a4;
+  border: 1px solid #053305; }
+
 @media only screen and (max-width: 360px) {
   .list {
     right: 50px; }
@@ -7561,4 +7591,4 @@ body {
     width: 90%;
     height: 300px;
     margin: 40% auto;
-    padding: 8px; } } */
+    padding: 8px; } }

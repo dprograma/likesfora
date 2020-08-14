@@ -10,22 +10,30 @@ if (isset($_SERVER['REQUEST_METHOD'])) {
                 include "../classes/Signup.php";
                 $firstname = filter_input(INPUT_POST, 'firstname', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
                 $lastname = filter_input(INPUT_POST, 'lastname', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
-                $username = filter_input(INPUT_POST, 'username', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+                $gender = filter_input(INPUT_POST, 'gender', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+                $dob = filter_input(INPUT_POST, 'dob', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
                 $password = filter_input(INPUT_POST, 'password', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
                 $confirm = filter_input(INPUT_POST, 'confirm', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
                 $email = filter_input(INPUT_POST, 'email', FILTER_SANITIZE_EMAIL, FILTER_VALIDATE_EMAIL);
                 $phone = filter_input(INPUT_POST, 'phone', FILTER_SANITIZE_NUMBER_INT);
-                $start = 100000;
-                $end = 10000000;
-                $userid = rand($start, $end);
-                $user = "user";
-                $url = "{$directory}controllers/usercontroller.php";
-                $redirect = "../index.php";
-                $subject = "User Registration";
-                $from  = "info@likesfora.com";
-                $list = [$userid, $email, $password, $firstname, $lastname, $username, $phone];
-                $signup = new Signup;
-                $signup->create($user, $firstname, $url, $redirect, $subject, $from, $password, $confirm, $email, $list);
+                list($year, $month, $day) = explode('-', $dob);
+                $age = date('Y') - $year;
+                if ($age < 18) {
+                    $_SESSION['error'] = "You are not eligible to register on this platform.";
+                    header("location:../view/signup.php");
+                } else {
+                    $start = 100000;
+                    $end = 10000000;
+                    $userid = rand($start, $end);
+                    $user = "user";
+                    $url = "{$directory}controllers/usercontroller.php";
+                    $redirect = "../index.php";
+                    $subject = "User Registration";
+                    $from  = "info@likesfora.com";
+                    $list = [$userid, $email, $password, $firstname, $lastname,$dob, $gender, $phone];
+                    $signup = new Signup;
+                    $signup->create($user, $firstname, $url, $redirect, $subject, $from, $password, $confirm, $email, $list);
+                }
                 break;
 
             case 'Sign In To LikesFora':

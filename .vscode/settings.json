@@ -1,4 +1,8 @@
 {
     "editor.wordWrap": "wordWrapColumn",
-    "git.ignoreLimitWarning": true
+    "git.ignoreLimitWarning": true,
+    "workbench.colorCustomizations": {
+        "editorError.border": "#ca2323a4",
+        "editorError.foreground": "#ffffffb7"
+      }
 }

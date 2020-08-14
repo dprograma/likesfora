@@ -10,9 +10,9 @@
                       <p class="indicatortext"><img src="../assets/images/online2.png" alt="friend requests" class="rqst"> 2 friends requests</p>
                       <p></p>
                       <p class="friendboard">
-                        <img src="../assets/images/friendlist2.png" alt="friend list" class="imgboard mr-3">Friend List
+                        <a class="text-decoration-none" href="../view/friendlist.php" style="color:inherit;"><img src="../assets/images/friendlist2.png" alt="friend list" class="imgboard mr-3">Friend List</a>
                       </p>
-                      <p class="indicatortext">See all your friends</p>
+                      <p class="indicatortext"><a class="text-decoration-none" href="../view/friendlist.php" style="color:inherit;">See all your friends</a></p>
                       <p></p>
                       <p class="friendboard">
                         <img src="../assets/images/likes2.png" alt="your likes" class="imgboard mr-3">Your Likes

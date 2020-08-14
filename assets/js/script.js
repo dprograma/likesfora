@@ -136,9 +136,6 @@ $(document).ready(function () {
 
     });
 
-
-
-
     $("#backgd").on("click keyup", function (e) {
         e.preventDefault();
         $(".workbg").toggle({
@@ -179,13 +176,6 @@ $(document).ready(function () {
     });
 });
 
-    // jQuery(function ($){
-    //     $(document).ajaxStop(function(){
-    //         $("#ajax_loader").hide();
-    //      });
-    //      $(document).ajaxStart(function(){
-    //          $("#ajax_loader").show();
-    //      });    
-    // });    
+    
 
 

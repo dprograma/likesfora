@@ -11,7 +11,7 @@
     <body>
       <!-- top row for heading with logo and user account -->
 
-      <?php include "../view/partials/__nav2.php"; ?>
+      <?php include "partials/__nav2.php"; ?>
       <?php $margintop = "mt-5"; ?>
       <!-- adjustment to the page -->
       <div class="container-fluid containermobile">
