@@ -7489,6 +7489,35 @@ body {
 .clspopup:hover {
   background-color: #aeb2b3; }
 
+.tagclass {
+  box-sizing: border-box;
+  border-radius: 50px;
+  margin: 9px;
+  min-width: 140px;
+  max-width: 160px;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  padding-right: 7px;
+  padding-left: 28px;
+  background-color: #f8f9fa; }
+
+.notag {
+  margin-top: 15px;
+  margin-right: -25px;
+  z-index: 1;
+  cursor: pointer; }
+
+.tagnav {
+  width: 30px;
+  height: 30px;
+  border-style: solid;
+  border-radius: 50%;
+  cursor: pointer;
+  transform: translateY(20px); }
+
+.tagnav:hover {
+  background-color: #aeb2b3; }
+
 .imgclass {
   position: relative;
   display: block;
@@ -7562,9 +7591,60 @@ body {
   background-color: #a4f8a4;
   border: 1px solid #053305; }
 
+.postimage {
+  width: 2.5rem;
+  height: 2rem; }
+
+.emoji-picker-icon {
+  padding-top: 8px;
+  padding-right: 10px;
+  color: #fff !important;
+  -webkit-text-stroke-width: 1px;
+  -webkit-text-stroke-color: dimgray;
+  -moz-text-stroke-width: 1px;
+  -moz-text-stroke-color: dimgray; }
+
+.thumbnail {
+  width: 120px;
+  height: 100px;
+  margin: 10px;
+  float: left; }
+
+#imgresult {
+  border: 4px dotted #cccccc;
+  display: none;
+  float: left;
+  margin: 0 auto;
+  width: 511px; }
+
+.postcard {
+  min-width: 768px; }
+
+.tooltip.tooltip-top,
+.tooltip.tooltip-bottom,
+.tooltip.tooltip-left,
+.tooltip.tooltip-right,
+.tooltip {
+  z-index: 10000; }
+
+.comment-form-container {
+  background: #f0f0f0;
+  border: #e0dfdf 1px solid;
+  padding: 20px;
+  border-radius: 2px; }
+
+.input-row {
+  margin-bottom: 20px; }
+
+.input-field {
+  width: 100%;
+  border-radius: 2px;
+  padding: 10px;
+  border: #e0dfdf 1px solid; }
+
 @media only screen and (max-width: 360px) {
   .list {
-    right: 50px; }
+    right: 30px; }
   .otherstyle {
     margin-right: 0px !important;
     margin-left: 0px !important; }

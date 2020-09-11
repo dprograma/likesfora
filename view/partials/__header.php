@@ -5,14 +5,20 @@ $directory = "C:/xampp/htdocs/likesfora/";
 //include config file
 include "{$directory}config/config.php";
 //retrieve all user details
-isset($_SESSION['userid']) ? $userid = $_SESSION['userid'] : $userid = '';
+isset($_GET['id']) ? $id = $_GET['id'] : $id = '';
+isset($_SESSION['userid']) ? $userid = $_SESSION['userid'] : $userid = $id;
 isset($_SESSION['email']) ? $email = $_SESSION['email'] : $email = '';
 isset($_SESSION['password']) ? $password = $_SESSION['password'] : $password =  '';
 
+
+$stmt = $mysqli->query("SELECT COUNT(*) AS `requests` FROM request WHERE `userid` = '$userid'");
+$request = $stmt->fetch_assoc()['requests'];
+
+
 //retrieve all values from users table
-$sql = "SELECT * FROM user WHERE `email` = ? AND `password` = ?";
+$sql = "SELECT * FROM user WHERE `userid` = ?";
 $stmt = $mysqli->prepare($sql);
-$stmt->bind_param('ss', $email, $password);
+$stmt->bind_param('i', $userid);
 $stmt->execute();
 $result = $stmt->get_result();
 while ($row = $result->fetch_assoc()) {
@@ -82,10 +88,10 @@ isset($_SESSION['description']) ? $description = $_SESSION['description'] : $des
 isset($_SESSION['bio']) ? $bio = $_SESSION['bio'] : $bio = '';
 isset($_SESSION['coverimage']) ? $coverimage = $_SESSION['coverimage'] : $coverimage = 'defaultcoverimg.png';
 isset($_SESSION['profileimage']) ? $profileimage = $_SESSION['profileimage'] : $profileimage = 'avater.png';
-isset($_SESSION['work']) ? $work = $_SESSION['work'] : $work = '';
 isset($_SESSION['work1']) ? $work1 = $_SESSION['work1'] : $work1 = '';
 isset($_SESSION['work2']) ? $work2 = $_SESSION['work2'] : $work2 = '';
 isset($_SESSION['work3']) ? $work3 = $_SESSION['work3'] : $work3 = '';
+isset($_SESSION['work4']) ? $work4 = $_SESSION['work4'] : $work4 = '';
 isset($_SESSION['education']) ? $education = $_SESSION['education'] : $education = '';
 isset($_SESSION['education1']) ? $education1 = $_SESSION['education1'] : $education1 = '';
 isset($_SESSION['education2']) ? $education2 = $_SESSION['education2'] : $education2 = '';

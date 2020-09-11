@@ -1,5 +1,5 @@
 <?php
-include "partials/__header.php";
+include "partials/__userheader.php";
 if ($loggedin == 1 || $registered == 1) {
 ?>
     <!DOCTYPE html>
@@ -12,7 +12,7 @@ if ($loggedin == 1 || $registered == 1) {
         <!-- top row for heading with logo and user account -->
         <?php include "partials/__nav2.php"; ?>
         <div class="profilelayer">
-            <?php include "partials/__userstopblock.php"; ?>
+            <?php include "partials/__userstopblock.php";?>
             <div class="container containertopmargin">
                 <div class="row justify-content-center">
                     <div class="col-md-4 col-12">
@@ -34,11 +34,8 @@ if ($loggedin == 1 || $registered == 1) {
                 </div>
             </div>
         </div>
-        <div class="overlay"></div>
-        <div id="editcontent" class="customshadow popup" style="transform: translate(0px, -50px); -ms-transform: translate(0px, -50px); -moz-transform: translate(0px, -50px);"></div>
-        <div id='ajax_loader' style="position: fixed; left: 50%; top: 50%; display: none;">
-            <img src="../assets/images/gif/ajax-loader.gif">
-        </div>
+        <?php include "partials/__popup.php"; ?>
+        <?php include "partials/__script.php"; ?>
     </body>
 
     </html>

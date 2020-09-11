@@ -18,10 +18,9 @@
     <div class="card-body pt-1">
       <div class="card-text">
         <img src="../assets/images/profile/<?php echo $profileimage; ?>" alt="profle name" class="postimg mr-1">
-        <p style="font-size:14px;">Say something to friends...</p>
       </div>
-      <form method="get" action="">
-        <input type="text" class="form-control mt-2">
+      <form method="POST">     
+        <input type="button" value="Say something to friends..." class="rounded-pill btn-block p-2 pl-3 text-left mt-2 sendpost">
       </form>
     </div>
   </div>

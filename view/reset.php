@@ -29,6 +29,7 @@ include "../view/partials/__head.php"; ?>
             </div>
         </div>
     </div>
+    <?php include "partials/__script.php"; ?>
 </body>
 
 </html>

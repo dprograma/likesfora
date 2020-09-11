@@ -56,6 +56,8 @@ if ($loggedin == 1 || $registered == 1) {
                 </div>
             </div>
         </div>
+        <?php include "partials/__popup.php"; ?>
+        <?php include "partials/__script.php"; ?>
     </body>
 
     </html>

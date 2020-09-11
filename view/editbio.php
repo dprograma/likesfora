@@ -33,6 +33,7 @@ if ($loggedin == 1 || $registered == 1) {
                 </form>
             </div>
         </div>
+        <?php include "partials/__script.php"; ?>
         <script>
             //countdown for textarea input
             function calculateDiscussCommentsRemainingCharsOne() {

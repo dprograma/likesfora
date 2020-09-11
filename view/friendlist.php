@@ -27,17 +27,17 @@ if ($loggedin == 1 || $registered == 1) {
                             $friendsid[] = $row['friendsid'];
                         }
                         $id = join(',', array_fill(0, count($friendsid), '?'));
-                        $sql = "SELECT * FROM user WHERE `userid` IN ($id)";
+                        $sql = "SELECT * FROM user WHERE `userId` IN ($id)";
                         $stms = $mysqli->prepare($sql);
                         $stms->bind_param(str_repeat('i', count($friendsid)), ...array_values($friendsid));
                         $stms->execute();
                         $res = $stms->get_result();
                         while ($row = $res->fetch_assoc()) {
                             !empty($row['profileimage']) ? $img = $row['profileimage'] : $img = 'avater.png';
-                            echo "<tr><td width='10%'><a href=''><img src='../assets/images/profile/$img' style='width:30px; height:30px;'></a></td><td width='60%'>" . $row['firstname'] . " " . $row['lastname'] . "</td><td width='30%' align='center'><form action='../controllers/postcontroller.php' method='post'><input type='hidden' name='csrf_token' value='$csrf_token'><input type='hidden' name='userid'  value='$userid'><input type='hidden' name='friendsid'  value='" . $row['userId'] . "'><input type='hidden' name='firstname'  value='" . $row['firstname'] . "'><input type='hidden' name='lastname'  value='" . $row['lastname'] . "'><button type='submit' name='action' value='Remove' class='rounded-pill pl-3 pr-3 pt-2 pb-2'><i class='fas fa-times pr-2'></i>Remove</button></form></td></tr>";
+                            echo "<tr><td width='10%'><a href='../view/user.php?id=" . $row['userId'] . "'><img src='../assets/images/profile/$img' style='width:30px; height:30px;'></a></td><td width='60%'>" . $row['firstname'] . " " . $row['lastname'] . "</td><td width='30%' align='center'><form action='../controllers/postcontroller.php' method='post'><input type='hidden' name='csrf_token' value='$csrf_token'><input type='hidden' name='userid'  value='$userid'><input type='hidden' name='friendsid'  value='" . $row['userId'] . "'><input type='hidden' name='firstname'  value='" . $row['firstname'] . "'><input type='hidden' name='lastname'  value='" . $row['lastname'] . "'><button type='submit' name='action' value='Remove' class='rounded-pill pl-3 pr-3 pt-2 pb-2'><i class='fas fa-times pr-2'></i>Remove</button></form></td></tr>";
                         }
                         if ($res->num_rows == 0) {
-                            echo "You have no friends list at this time. You can begin to add friends from the friends suggestion below";
+                            echo "You have no friends request at this time. You may begin to add friends from the friends suggestion below";
                         }
                         ?>
                     </table>
@@ -69,6 +69,7 @@ if ($loggedin == 1 || $registered == 1) {
                 </div>
             </div>
         </div>
+        <?php include "partials/__script.php"; ?>
     </body>
 
     </html>

@@ -4,13 +4,11 @@
   ?>
     <!DOCTYPE html>
     <html>
-
     <?php $title = $firstname . "'s page";
     include "partials/__head.php"; ?>
 
     <body>
       <!-- top row for heading with logo and user account -->
-
       <?php include "partials/__nav2.php"; ?>
       <?php $margintop = "mt-5"; ?>
       <!-- adjustment to the page -->
@@ -35,6 +33,12 @@
           <?php include "partials/__friendblock.php"; ?>
         </div>
       </div>
+      <div class="overlay" style="z-index:10000000000000000;"></div>
+      <div id="editcontent2" class="customshadow popup" style="position:fixed; left:50%; top: 50%; transform: translate(-50%, -100%)"></div>
+      <div id='ajax_loader' style="position: fixed; left: 50%; top: 50%; display: none;">
+        <img src="../assets/images/gif/ajax-loader.gif">
+      </div>
+      <?php include "partials/__script.php"; ?>
     </body>
 
     </html>

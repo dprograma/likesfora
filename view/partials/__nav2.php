@@ -50,11 +50,11 @@
         echo '';
       }
       ?>">
-        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+        <a class="nav-link dropdown-toggle" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
           <i class="fas fa-plus"></i> Create
         </a>
         <div class="dropdown-menu" aria-labelledby="navbarDropdown">
-          <a class="dropdown-item" href="#"><i class="fas fa-edit mr-2"></i> Post<p class="ml-4"><small><em>Share your post to friends.</em></small></p></a>
+          <a class="dropdown-item sendpost"><i class="fas fa-edit mr-2"></i> Post<p class="ml-4"><small><em>Share your post to friends.</em></small></p></a>
           <a class="dropdown-item" href="#"><i class="fas fa-book-open mr-2"></i> Story<p class="ml-4"><small><em>Share a video or text to your friends.</em></small></p></a>
           <a class="dropdown-item" href="#"><i class="far fa-star mr-2"></i> Event<p class="ml-4"><small><em>Add a life even and share.</em></small></p></a>
           <div class="dropdown-divider"></div>

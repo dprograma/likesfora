@@ -27,7 +27,7 @@ if ($loggedin == 1 || $registered == 1) {
                     $imgprev = $coverimage;
                 } ?>"
                 <div class="card">
-                    <img id="imgprev" style="position:relative; display: block; width: 192px; height: 192px;border-radius: 4px;margin:0 auto;" src="../assets/images/profile/<?php echo $imgprev; ?>" alt="">
+                    <img class="imgprev" style="position:relative; display: block; width: 192px; height: 192px;border-radius: 4px;margin:0 auto;" src="../assets/images/profile/<?php echo $imgprev; ?>" alt="">
                 </div>
                 <div class="card ml-auto p-3">
                     <form class="uploadform" method="POST">
@@ -44,6 +44,7 @@ if ($loggedin == 1 || $registered == 1) {
                 </div>
             </div>
         </div>
+        <?php include "partials/__script.php"; ?>
     </body>
 
     </html>

@@ -37,7 +37,7 @@ class Upload
         }
         // Check if $uploadOk is set to 0 by an error
         if ($uploadOk == 0) {
-            $errormsg .= "Your file was not uploaded.";
+            $errormsg .= " Your file was not uploaded.";
             // if everything is ok, try to upload file
         } else {
             if (move_uploaded_file($_FILES["profileimage"]["tmp_name"], $imageName)) {
