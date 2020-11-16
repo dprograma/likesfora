@@ -1,4 +1,6 @@
 <script type="text/javascript" src="../assets/js/app.js"></script>
+<script src="../assets/js/sinch.min.js"></script>
+<script src="../assets/js/sinchindex.js"></script>
 <script src="../assets/emojilib/js/config.js"></script>
 <script src="../assets/emojilib/js/util.js"></script>
 <script src="../assets/emojilib/js/jquery.emojiarea.js"></script>

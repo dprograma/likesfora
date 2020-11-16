@@ -8,6 +8,7 @@
     include "partials/__head.php"; ?>
 
     <body>
+      <!-- likes class declaration for displaying total user likes -->
       <!-- top row for heading with logo and user account -->
       <?php include "partials/__nav2.php"; ?>
       <?php $margintop = "mt-5"; ?>
@@ -39,6 +40,70 @@
         <img src="../assets/images/gif/ajax-loader.gif">
       </div>
       <?php include "partials/__script.php"; ?>
+      <script>
+        function getPostLikesUnlikes() {
+          $.ajax({
+            type: 'POST',
+            async: false,
+            url: '../controllers/getpostlikeunlike.php',
+            success: function(data) {
+              var data = JSON.parse(data);
+              var totalLikes = data.posttotallikes;
+              var post = eval("'#likes" + data.postid + "'");
+              var pos = eval("'#div" + data.postid + "'");
+              var fas = eval("'#fas" + data.postid + "'");
+              if (totalLikes > 0) {
+                $(pos).removeClass('d-none');
+                $(fas).css({
+                  'color': '#157efb'
+                });
+                $(post).html(totalLikes + " Like" + addS(totalLikes));
+              }
+            }
+          });
+        }
+
+        $(document).ready(function() {
+          getPostLikesUnlikes();
+        });
+
+        function addS(obj) {
+          if (obj > 1) {
+            var text = "s";
+            return text;
+          } else {
+            return "";
+          }
+        }
+
+        function displaylikes(obj) {
+          var formdata = $("form", obj).serialize();
+          $.ajax({
+            url: "../controllers/postlikeunlike.php",
+            type: 'POST',
+            data: formdata,
+            datatype: 'JSON',
+            success: function(data) {
+              var data = JSON.parse(data);
+              var post = eval("'#likes" + data.postid + "'");
+              var pos = eval("'#div" + data.postid + "'");
+              if (data.posttotallikes > 0) {
+                $(pos).removeClass('d-none');
+                $("i", obj).css({
+                  'color': '#157efb'
+                });
+                $(post).html(data.posttotallikes + " Like" + addS(data.posttotallikes));
+              }else{
+                $(pos).addClass('d-none');
+                $("i", obj).css({
+                  'color': '#7f7f7f'
+                });
+                $(post).html("");
+              }
+            }
+          });
+        }
+      </script>
     </body>
 
     </html>

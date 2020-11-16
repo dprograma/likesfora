@@ -3,7 +3,7 @@
 session_start();
 if (isset($_SERVER['REQUEST_METHOD'])) {
     if (isset($_REQUEST['action'])) {
-        include "../config/directory.php";
+        include "../directory.php";
         $action  = $_REQUEST['action'];
         switch ($action) {
             case 'Sign Up For LikesFora':

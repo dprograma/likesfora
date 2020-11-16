@@ -1,4 +1,269 @@
 (function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
+// shim for using process in browser
+var process = module.exports = {};
+
+// cached from whatever global is present so that test runners that stub it
+// don't break things.  But we need to wrap it in a try catch in case it is
+// wrapped in strict mode code which doesn't define any globals.  It's inside a
+// function because try/catches deoptimize in certain engines.
+
+var cachedSetTimeout;
+var cachedClearTimeout;
+
+function defaultSetTimout() {
+    throw new Error('setTimeout has not been defined');
+}
+function defaultClearTimeout () {
+    throw new Error('clearTimeout has not been defined');
+}
+(function () {
+    try {
+        if (typeof setTimeout === 'function') {
+            cachedSetTimeout = setTimeout;
+        } else {
+            cachedSetTimeout = defaultSetTimout;
+        }
+    } catch (e) {
+        cachedSetTimeout = defaultSetTimout;
+    }
+    try {
+        if (typeof clearTimeout === 'function') {
+            cachedClearTimeout = clearTimeout;
+        } else {
+            cachedClearTimeout = defaultClearTimeout;
+        }
+    } catch (e) {
+        cachedClearTimeout = defaultClearTimeout;
+    }
+} ())
+function runTimeout(fun) {
+    if (cachedSetTimeout === setTimeout) {
+        //normal enviroments in sane situations
+        return setTimeout(fun, 0);
+    }
+    // if setTimeout wasn't available but was latter defined
+    if ((cachedSetTimeout === defaultSetTimout || !cachedSetTimeout) && setTimeout) {
+        cachedSetTimeout = setTimeout;
+        return setTimeout(fun, 0);
+    }
+    try {
+        // when when somebody has screwed with setTimeout but no I.E. maddness
+        return cachedSetTimeout(fun, 0);
+    } catch(e){
+        try {
+            // When we are in I.E. but the script has been evaled so I.E. doesn't trust the global object when called normally
+            return cachedSetTimeout.call(null, fun, 0);
+        } catch(e){
+            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error
+            return cachedSetTimeout.call(this, fun, 0);
+        }
+    }
+
+
+}
+function runClearTimeout(marker) {
+    if (cachedClearTimeout === clearTimeout) {
+        //normal enviroments in sane situations
+        return clearTimeout(marker);
+    }
+    // if clearTimeout wasn't available but was latter defined
+    if ((cachedClearTimeout === defaultClearTimeout || !cachedClearTimeout) && clearTimeout) {
+        cachedClearTimeout = clearTimeout;
+        return clearTimeout(marker);
+    }
+    try {
+        // when when somebody has screwed with setTimeout but no I.E. maddness
+        return cachedClearTimeout(marker);
+    } catch (e){
+        try {
+            // When we are in I.E. but the script has been evaled so I.E. doesn't  trust the global object when called normally
+            return cachedClearTimeout.call(null, marker);
+        } catch (e){
+            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error.
+            // Some versions of I.E. have different rules for clearTimeout vs setTimeout
+            return cachedClearTimeout.call(this, marker);
+        }
+    }
+
+
+
+}
+var queue = [];
+var draining = false;
+var currentQueue;
+var queueIndex = -1;
+
+function cleanUpNextTick() {
+    if (!draining || !currentQueue) {
+        return;
+    }
+    draining = false;
+    if (currentQueue.length) {
+        queue = currentQueue.concat(queue);
+    } else {
+        queueIndex = -1;
+    }
+    if (queue.length) {
+        drainQueue();
+    }
+}
+
+function drainQueue() {
+    if (draining) {
+        return;
+    }
+    var timeout = runTimeout(cleanUpNextTick);
+    draining = true;
+
+    var len = queue.length;
+    while(len) {
+        currentQueue = queue;
+        queue = [];
+        while (++queueIndex < len) {
+            if (currentQueue) {
+                currentQueue[queueIndex].run();
+            }
+        }
+        queueIndex = -1;
+        len = queue.length;
+    }
+    currentQueue = null;
+    draining = false;
+    runClearTimeout(timeout);
+}
+
+process.nextTick = function (fun) {
+    var args = new Array(arguments.length - 1);
+    if (arguments.length > 1) {
+        for (var i = 1; i < arguments.length; i++) {
+            args[i - 1] = arguments[i];
+        }
+    }
+    queue.push(new Item(fun, args));
+    if (queue.length === 1 && !draining) {
+        runTimeout(drainQueue);
+    }
+};
+
+// v8 likes predictible objects
+function Item(fun, array) {
+    this.fun = fun;
+    this.array = array;
+}
+Item.prototype.run = function () {
+    this.fun.apply(null, this.array);
+};
+process.title = 'browser';
+process.browser = true;
+process.env = {};
+process.argv = [];
+process.version = ''; // empty string to avoid regexp issues
+process.versions = {};
+
+function noop() {}
+
+process.on = noop;
+process.addListener = noop;
+process.once = noop;
+process.off = noop;
+process.removeListener = noop;
+process.removeAllListeners = noop;
+process.emit = noop;
+process.prependListener = noop;
+process.prependOnceListener = noop;
+
+process.listeners = function (name) { return [] }
+
+process.binding = function (name) {
+    throw new Error('process.binding is not supported');
+};
+
+process.cwd = function () { return '/' };
+process.chdir = function (dir) {
+    throw new Error('process.chdir is not supported');
+};
+process.umask = function() { return 0; };
+
+},{}],2:[function(require,module,exports){
+(function (setImmediate,clearImmediate){
+var nextTick = require('process/browser.js').nextTick;
+var apply = Function.prototype.apply;
+var slice = Array.prototype.slice;
+var immediateIds = {};
+var nextImmediateId = 0;
+
+// DOM APIs, for completeness
+
+exports.setTimeout = function() {
+  return new Timeout(apply.call(setTimeout, window, arguments), clearTimeout);
+};
+exports.setInterval = function() {
+  return new Timeout(apply.call(setInterval, window, arguments), clearInterval);
+};
+exports.clearTimeout =
+exports.clearInterval = function(timeout) { timeout.close(); };
+
+function Timeout(id, clearFn) {
+  this._id = id;
+  this._clearFn = clearFn;
+}
+Timeout.prototype.unref = Timeout.prototype.ref = function() {};
+Timeout.prototype.close = function() {
+  this._clearFn.call(window, this._id);
+};
+
+// Does not start the time, just sets up the members needed.
+exports.enroll = function(item, msecs) {
+  clearTimeout(item._idleTimeoutId);
+  item._idleTimeout = msecs;
+};
+
+exports.unenroll = function(item) {
+  clearTimeout(item._idleTimeoutId);
+  item._idleTimeout = -1;
+};
+
+exports._unrefActive = exports.active = function(item) {
+  clearTimeout(item._idleTimeoutId);
+
+  var msecs = item._idleTimeout;
+  if (msecs >= 0) {
+    item._idleTimeoutId = setTimeout(function onTimeout() {
+      if (item._onTimeout)
+        item._onTimeout();
+    }, msecs);
+  }
+};
+
+// That's not how node.js implements it but the exposed api is the same.
+exports.setImmediate = typeof setImmediate === "function" ? setImmediate : function(fn) {
+  var id = nextImmediateId++;
+  var args = arguments.length < 2 ? false : slice.call(arguments, 1);
+
+  immediateIds[id] = true;
+
+  nextTick(function onNextTick() {
+    if (immediateIds[id]) {
+      // fn.call() is faster so we optimize for the common use-case
+      // @see http://jsperf.com/call-apply-segu
+      if (args) {
+        fn.apply(null, args);
+      } else {
+        fn.call(null);
+      }
+      // Prevent ids from leaking
+      exports.clearImmediate(id);
+    }
+  });
+
+  return id;
+};
+
+exports.clearImmediate = typeof clearImmediate === "function" ? clearImmediate : function(id) {
+  delete immediateIds[id];
+};
+}).call(this,require("timers").setImmediate,require("timers").clearImmediate)
+},{"process/browser.js":1,"timers":2}],3:[function(require,module,exports){
 // Loading button
 (function($) {
 $.fn.button = function(action) {
@@ -27,7 +292,7 @@ $('.button-loader').button('reset');
  
  */
 
-},{}],2:[function(require,module,exports){
+},{}],4:[function(require,module,exports){
 $(document).ready(function () {
     $('#error').fadeIn().delay(5000).fadeOut();
     $('#success').fadeIn().delay(5000).fadeOut();
@@ -295,7 +560,312 @@ $(document).ready(function () {
 
     });
 
-    
+    $(document).ready(function () {
+        $(".likesimage").on("mouseover", function () {
+            $(".toptotallikes").css({
+                'transform': 'scale(1.5) translateX(15px)',
+                'transition': '0.3s ease'
+            });
+        });
+
+        $(".likesimage").on("mouseout", function () {
+            $(".toptotallikes").css({
+                'transform': 'scale(1.0) translateX(0px)',
+                'transition': '0.3s ease',
+            });
+        });
+    });
+
+    // function humanreadable(timestamp){
+
+    //     var time_ago        = new Date(timestamp).getTime();
+    //     var current_time    = new Date().getTime();
+    //     var time_difference = current_time - time_ago;
+    //     var seconds         = time_difference;
+
+    //     var minutes = Math.round(seconds / 60); // value 60 is seconds  
+    //     var hours   = Math.round(seconds / 3600); //value 3600 is 60 minutes * 60 sec  
+    //     var days    = Math.round(seconds / 86400); //86400 = 24 * 60 * 60;  
+    //     var weeks   = Math.round(seconds / 604800); // 7*24*60*60;  
+    //     var months  = Math.round(seconds / 2629440); //((365+365+365+365+366)/5/12)*24*60*60  
+    //     var years   = Math.round(seconds / 31553280); //(365+365+365+365+366)/5 * 24 * 60 * 60
+
+    //     if (seconds <= 60){
+
+    //       return "Just Now";
+
+    //     } else if (minutes <= 60){
+
+    //       if (minutes == 1){
+
+    //         return "one minute ago";
+
+    //       } else {
+
+    //         return "$minutes minutes ago";
+
+    //       }
+
+    //     } else if (hours <= 24){
+
+    //       if (hours == 1){
+
+    //         return "an hour ago";
+
+    //       } else {
+
+    //         return hours+" hrs ago";
+
+    //       }
+
+    //     } else if (days <= 7){
+
+    //       if (days == 1){
+
+    //         return "yesterday";
+
+    //       } else {
+
+    //         return days+" days ago";
+
+    //       }
+
+    //     } else if (weeks <= 4.3){
+
+    //       if (weeks == 1){
+
+    //         return "a week ago";
+
+    //       } else {
+
+    //         return weeks+" weeks ago";
+
+    //       }
+
+    //     } else if (months <= 12){
+
+    //       if (months == 1){
+
+    //         return "a month ago";
+
+    //       } else {
+
+    //         return months+" months ago";
+
+    //       }
+
+    //     } else {
+
+    //       if (years == 1){
+
+    //         return "one year ago";
+
+    //       } else {
+
+    //         return years+" years ago";
+
+    //       }
+    //     }
+    //   }
+
+
+    // function postReply(commentId) {
+    //     $('#commentId').val(commentId);
+    //     $("#name").focus();
+    // }
+
+    // $("#commentform").on("submit", function (e) {
+    //     e.preventDefault();
+    //     $("#commentmessage").css('display', 'none');
+    //     var str = $(this).serialize();
+    //     $.ajax({
+    //         url: "../controllers/addcommentcontroller.php",
+    //         data: str,
+    //         type: 'post',
+    //         success: function (response) {
+    //             var result = eval('(' + response + ')');
+    //             if (response) {
+    //                 $("#commentmessage").css('display', 'inline-block');
+    //                 $("#comment").val("");
+    //                 $("#commentid").val("");
+    //                 listComment();
+    //             } else {
+    //                 alert("Failed to add comments !");
+    //                 return false;
+    //             }
+    //         }
+    //     });
+    // });
+
+    // listComment();
+
+    // function listComment() {
+    //     $.ajax({
+    //         url:"../controllers/fetchcommentcontroller.php",
+    //         type: "post",
+    //         datatype: "JSON",
+    //         success: function(data){
+    //             var data = JSON.parse(data)
+    //             var comments = "";
+    //             var replies = "";
+    //             var item = "";
+    //             var parent = -1;
+    //             var results = new Array();
+
+    //             var list = $("<ul style='list-style:none;'>");
+    //             var item = $("<li>").html(comments);
+
+    //             for (var i = 0; (i < data.length); i++) {
+    //                 var commentId = data[i]['commentid'];
+    //                 parent = data[i]['parentcommentid'];
+
+    //                 if (parent == "0") {
+    //                     comments = "<div class='card mt-2 mb-2' style='font-size:0.75rem;'>" +
+    //                         "<div class='card-header'>from <b>from" + data[i]['comment_sender_name'] + "</b> at <i>" + humanreadable(data[i]['datecreated']) + "</i></div>" +
+    //                         "<div class='card-body'>" + data[i]['comment'] + "</div>" +
+    //                         "<div class='card-footer' align='right'><a class='rounded-pill p-2' onClick='postReply(" + commentId + ")'>Reply</a></div>" +
+    //                         "</div>";
+
+    //                     var item = $("<li>").html(comments);
+    //                     list.append(item);
+    //                     var reply_list = $("<ul style='list-style:none;'>");
+    //                     item.append(reply_list);
+    //                     listReplies(commentId, data, reply_list);
+    //                 }
+    //             }
+    //             $("#commentdisplay").html(list);
+    //         }
+    //         });
+    //     }
+
+    //     $.post("../controllers/fetchcommentcontroller.php",
+    //         function (data) {
+    //             var comments = "";
+    //             var replies = "";
+    //             var item = "";
+    //             var parent = -1;
+    //             var results = new Array();
+
+    //             var list = $("<ul class='outer-comment'>");
+    //             var item = $("<li>").html(comments);
+
+    //             for (var i = 0; (i < data.length); i++) {
+    //                 var commentId = data[i]['commentid'];
+    //                 parent = data[i]['parentcommentid'];
+
+    //                 if (parent == "0") {
+    //                     comments = "<div class='comment-row'>" +
+    //                         "<div class='comment-info'><span class='commet-row-label'>from</span> <span class='posted-by'>" + data[i]['comment_sender_name'] + " </span> <span class='commet-row-label'>at</span> <span class='posted-at'><?php echo humanreadable(" + data[i]['datecreated'] + "); ?></span></div>" +
+    //                         "<div class='comment-text'>" + data[i]['comment'] + "</div>" +
+    //                         "<div><a class='btn-reply' onClick='postReply(" + commentId + ")'>Reply</a></div>" +
+    //                         "</div>";
+
+    //                     var item = $("<li>").html(comments);
+    //                     list.append(item);
+    //                     var reply_list = $('<ul>');
+    //                     item.append(reply_list);
+    //                     listReplies(commentId, data, reply_list);
+    //                 }
+    //             }
+    //             $("#commentdisplay").html(list);
+    //         });
+    // }
+
+    // function listReplies(commentId, data, list) {
+    //     for (var i = 0; (i < data.length); i++) {
+    //         if (commentId == data[i].parentcommentid) {
+    //             var comments = "<div class='card mt-2 mb-2' style='font-size:0.75rem;'>" +
+    //                 "<div class='card-header'>from <b>" + data[i]['comment_sender_name'] + " </b> at <i> class='posted-at'>" + humanreadable(data[i]['datecreated']) + "</i></div>" +
+    //                 "<div class='card-body'>" + data[i]['comment'] + "</div>" +
+    //                 "<div class='card-footer' align='right'><a class='rounded-pill p-2' onClick='postReply(" + data[i]['commentid'] + ")'>Reply</a></div>" +
+    //                 "</div>";
+    //             var item = $("<li>").html(comments);
+    //             var reply_list = $("<ul style='list-style:none;'>");
+    //             list.append(item);
+    //             item.append(reply_list);
+    //             listReplies(data[i].comment_id, data, reply_list);
+    //         }
+    //     }
+    // }
+
+    // $(".commentform").on("submit", function (e) {
+    //     e.preventDefault();
+    //     var formdata = $(this).serialize();
+    //     $.ajax({
+    //         url: '../controllers/addcommentcontroller.php',
+    //         data: formdata,
+    //         method: 'POST',
+    //         datatype: 'JSON',
+    //         success: function (data) {
+    //             if (data.error != '') {
+    //                 $(".commentform")[0].reset();
+    //                 $(".commentmessage").html(data.error);
+    //                 var id = $("input[name='loggedinuserid']").val();
+    //                 $(".commentid").val(id);
+    //                 loadcomment();
+    //             }
+    //         }
+    //     });
+    // });
+
+    // $(".commentform").on("submit", function (e) {
+    //     e.preventDefault();
+    //     var formdata = $(this).serialize();
+    //     var buttonvalue = $(this).find('button[name=action]').val();
+    //     $.ajax({
+    //         url: '../view/viewpost.php?action=' + buttonvalue,
+    //         data: formdata,
+    //         method: 'POST',
+    //         datatype: 'JSON',
+    //         success: function(response){
+    //             location.href="../view/viewpost.php";
+    //         }
+    //     });
+    // });
+
+    // loadcomment();
+
+    // function loadcomment() {
+    //     var id = $("input[name='loggedinuserid']").val();
+    //     var sid = $("input[name='senderid']").val();
+    //     var pid = $("input[name='postid']").val();
+    //     $.ajax({
+    //         url: '../controllers/fetchcommentcontroller.php',
+    //         method: 'POST',
+    //         data: 'loggedinuserid=' + id + '&senderid=' + sid + '&postid=' + pid,
+    //         datatype: 'JSON',
+    //         success: function (response) {
+    //             if (response !== "") {
+    //                 var data = JSON.parse(response);
+    //                 //var post = eval("'#post" + data.postid + "'");
+    //                 // $(post).css({ 'background-color': 'green', 'display': 'block', 'width': '100%', 'height': '30px' });
+
+    //                 // console.log(response);
+    //                 $("#commentdisplay").html(data.message);
+
+    //             }
+    //         }
+    //     });
+    // }
+
+    // $("document").on("click", ".reply", function () {
+    //     var commentid = $(this).attr('id');
+    //     $("input[name='senderid']").val(commentid);
+    //     $("#comment").focus();
+    // });
+
+    // function focuscomment(obj){
+    //     obj.click(function (){
+    //         $('.comment').focus();
+    //     });
+    // }
+
+    // function onreply(obj) {
+    //     var commentid = obj.attr('id');
+    //     $("input[name='senderid']").val(commentid);
+    //     $(".comment").focus();
+    // }
+
     $("#backgd").on("click keyup", function (e) {
         e.preventDefault();
         $(".workbg").toggle({
@@ -358,17 +928,229 @@ $(document).ready(function () {
 
 
 
-},{}],3:[function(require,module,exports){
+},{}],5:[function(require,module,exports){
+(function (global,setImmediate){
+!function(e,t){"object"==typeof exports&&"object"==typeof module?module.exports=t():"function"==typeof define&&define.amd?define([],t):"object"==typeof exports?exports.PUBNUB=t():e.PUBNUB=t()}(this,function(){return function(e){var t={};function n(i){if(t[i])return t[i].exports;var r=t[i]={exports:{},id:i,loaded:!1};return e[i].call(r.exports,r,r.exports,n),r.loaded=!0,r.exports}return n.m=e,n.c=t,n.p="",n(0)}([function(e,t,n){n(1);var i=n(2),r=n(3),s=n(4),o=n(8);window.console||(window.console=window.console||{}),console.log||(console.log=console.error=(window.opera||{}).postError||function(){});var a=function(){var e={},t=!1;try{t=window.localStorage}catch(e){return}var n=function(e){return-1===document.cookie.indexOf(e)?null:((document.cookie||"").match(RegExp(e+"=([^;]+)"))||[])[1]||null},i=function(e,t){document.cookie=e+"="+t+"; expires=Thu, 1 Aug "+((new Date).getFullYear()+1)+" 20:00:00 UTC; path=/"},r=function(){try{return i("pnctest","1"),"1"===n("pnctest")}catch(e){return!1}}();return{get:function(i){try{return t?t.getItem(i):r?n(i):e[i]}catch(t){return e[i]}},set:function(n,s){try{if(t)return t.setItem(n,s)&&0;r&&i(n,s),e[n]=s}catch(t){e[n]=s}}}}();function c(e,t){return r.HmacSHA256(e,t).toString(r.enc.Base64)}function u(e){return document.getElementById(e)}function h(e){console.error(e)}function l(e,t){var n=[];return s.each(e.split(/\s+/),function(e){s.each((t||document).getElementsByTagName(e),function(e){n.push(e)})}),n}function f(e,t,n){s.each(e.split(","),function(e){var i=function(e){e||(e=window.event),n(e)||(e.cancelBubble=!0,e.preventDefault&&e.preventDefault(),e.stopPropagation&&e.stopPropagation())};t.addEventListener?t.addEventListener(e,i,!1):t.attachEvent?t.attachEvent("on"+e,i):t["on"+e]=i})}function p(){return l("head")[0]}function d(e,t,n){if(!n)return e&&e.getAttribute&&e.getAttribute(t);e.setAttribute(t,n)}function g(e,t){for(var n in t)if(t.hasOwnProperty(n))try{e.style[n]=t[n]+("|width|height|top|left|".indexOf(n)>0&&"number"==typeof t[n]?"px":"")}catch(e){return}}function y(e){return document.createElement(e)}var m={list:{},unbind:function(e){m.list[e]=[]},bind:function(e,t){(m.list[e]=m.list[e]||[]).push(t)},fire:function(e,t){s.each(m.list[e]||[],function(e){e(t)})}};function v(e){var t,n,i=0,r=0,o=e.timeout||s.DEF_TIMEOUT,a=e.data||{},c=e.fail||function(){},u=e.success||function(){},h=function(e,r){i||(i=1,clearTimeout(n),t&&(t.onerror=t.onload=null,t.abort&&t.abort(),t=null),e&&c(r))};n=s.timeout(function(){h(1)},o);try{(t="undefined"!=typeof XDomainRequest&&new XDomainRequest||new XMLHttpRequest).onerror=t.onabort=function(){h(1,t.responseText||{error:"Network Connection Error"})},t.onload=t.onloadend=function(){if(!r){var e;r=1,clearTimeout(n);try{e=JSON.parse(t.responseText)}catch(e){return h(1)}u(e)}};var l=s.build_url(e.url,a);t.open("GET",l,!0),t.timeout=o,t.send()}catch(e){h(1,{error:"XHR Failed",stacktrace:e})}return h}function b(){if(!("onLine"in navigator))return 1;try{return navigator.onLine}catch(e){return!0}}function w(e){return"sendBeacon"in navigator&&navigator.sendBeacon(e)}var S=function(e){var t=e.leave_on_unload||0;e.xdr=v,e.db=a,e.error=e.error||h,e._is_online=b,e.hmac_SHA256=c,e.crypto_obj=i(),e.sendBeacon=w,e.sdk_family="Web";var n=function(e){return S(e)},r=s.PN_API(e);for(var C in r)r.hasOwnProperty(C)&&(n[C]=r[C]);return n.css=g,n.$=u,n.create=y,n.bind=f,n.head=p,n.search=l,n.attr=d,n.events=m,n.init=n,n.secure=n,n.crypto_obj=i(),n.WS=o,n.PNmessage=s.PNmessage,n.supplant=s.supplant,f("beforeunload",window,function(){return t&&n["each-channel"](function(e){n.LEAVE(e.name,0)}),!0}),n.ready(),e.notest?n:(f("offline",window,n.offline),f("offline",document,n.offline),n)};S.init=S,S.secure=S,S.crypto_obj=i(),S.WS=o,S.db=a,S.PNmessage=s.PNmessage,S.uuid=s.uuid,S.css=g,S.$=u,S.create=u,S.bind=f,S.head=p,S.search=l,S.attr=d,S.events=m,S.map=s.map,S.each=s.each,S.grep=s.grep,S.supplant=s.supplant,S.now=s.now,S.unique=s.unique,S.updater=s.updater,window.jQuery&&(window.jQuery.PUBNUB=S),e.exports=S},function(module,exports){(function(){window.JSON&&window.JSON.stringify||function(){function toJSON(e){try{return this.valueOf()}catch(e){return null}}window.JSON||(window.JSON={});var cx=/[\u0000\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g,escapable=/[\\\"\x00-\x1f\x7f-\x9f\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g,gap,indent,meta={"\b":"\\b","\t":"\\t","\n":"\\n","\f":"\\f","\r":"\\r",'"':'\\"',"\\":"\\\\"},rep;function quote(e){return escapable.lastIndex=0,escapable.test(e)?'"'+e.replace(escapable,function(e){var t=meta[e];return"string"==typeof t?t:"\\u"+("0000"+e.charCodeAt(0).toString(16)).slice(-4)})+'"':'"'+e+'"'}function str(e,t){var n,i,r,s,o,a=gap,c=t[e];switch(c&&"object"==typeof c&&(c=toJSON.call(c,e)),"function"==typeof rep&&(c=rep.call(t,e,c)),typeof c){case"string":return quote(c);case"number":return isFinite(c)?String(c):"null";case"boolean":case"null":return String(c);case"object":if(!c)return"null";if(gap+=indent,o=[],"[object Array]"===Object.prototype.toString.apply(c)){for(s=c.length,n=0;n<s;n+=1)o[n]=str(n,c)||"null";return r=0===o.length?"[]":gap?"[\n"+gap+o.join(",\n"+gap)+"\n"+a+"]":"["+o.join(",")+"]",gap=a,r}if(rep&&"object"==typeof rep)for(s=rep.length,n=0;n<s;n+=1)"string"==typeof(i=rep[n])&&(r=str(i,c))&&o.push(quote(i)+(gap?": ":":")+r);else for(i in c)Object.hasOwnProperty.call(c,i)&&(r=str(i,c))&&o.push(quote(i)+(gap?": ":":")+r);return r=0===o.length?"{}":gap?"{\n"+gap+o.join(",\n"+gap)+"\n"+a+"}":"{"+o.join(",")+"}",gap=a,r}}"function"!=typeof JSON.stringify&&(JSON.stringify=function(e,t,n){var i;if(gap="",indent="","number"==typeof n)for(i=0;i<n;i+=1)indent+=" ";else"string"==typeof n&&(indent=n);if(rep=t,t&&"function"!=typeof t&&("object"!=typeof t||"number"!=typeof t.length))throw new Error("JSON.stringify");return str("",{"":e})}),"function"!=typeof JSON.parse&&(JSON.parse=function(text){return eval("("+text+")")})}()}).call(window)},function(e,t,n){var i=n(3);e.exports=function(){var e="0123456789012345",t=["hex","utf8","base64","binary"],n=[128,256],r=["ecb","cbc"],s={encryptKey:!0,keyEncoding:"utf8",keyLength:256,mode:"cbc"};function o(e){return(e=e||{}).hasOwnProperty("encryptKey")||(e.encryptKey=s.encryptKey),e.hasOwnProperty("keyEncoding")||(e.keyEncoding=s.keyEncoding),e.hasOwnProperty("keyLength")||(e.keyLength=s.keyLength),e.hasOwnProperty("mode")||(e.mode=s.mode),-1==t.indexOf(e.keyEncoding.toLowerCase())&&(e.keyEncoding=s.keyEncoding),-1==n.indexOf(parseInt(e.keyLength,10))&&(e.keyLength=s.keyLength),-1==r.indexOf(e.mode.toLowerCase())&&(e.mode=s.mode),e}function a(e,t){var n,r,s;return n=e,e="base64"===(r=t).keyEncoding?i.enc.Base64.parse(n):"hex"===r.keyEncoding?i.enc.Hex.parse(n):n,t.encryptKey?i.enc.Utf8.parse((s=e,i.SHA256(s).toString(i.enc.Hex)).slice(0,32)):e}function c(e){return"ecb"===e.mode?i.mode.ECB:i.mode.CBC}function u(t){return"cbc"===t.mode?i.enc.Utf8.parse(e):null}return{encrypt:function(e,t,n){if(!t)return e;var r=u(n=o(n)),s=c(n),h=a(t,n),l=JSON.stringify(e);return i.AES.encrypt(l,h,{iv:r,mode:s}).ciphertext.toString(i.enc.Base64)||e},decrypt:function(e,t,n){if(!t)return e;var r=u(n=o(n)),s=c(n),h=a(t,n);try{var l=i.enc.Base64.parse(e),f=i.AES.decrypt({ciphertext:l},h,{iv:r,mode:s}).toString(i.enc.Utf8);return JSON.parse(f)}catch(e){return}}}}},function(e,t){var n,i,r,s,o,a,c,u,h,l,f=f||function(e,t){var n={},i=n.lib={},r=function(){},s=i.Base={extend:function(e){r.prototype=this;var t=new r;return e&&t.mixIn(e),t.hasOwnProperty("init")||(t.init=function(){t.$super.init.apply(this,arguments)}),t.init.prototype=t,t.$super=this,t},create:function(){var e=this.extend();return e.init.apply(e,arguments),e},init:function(){},mixIn:function(e){for(var t in e)e.hasOwnProperty(t)&&(this[t]=e[t]);e.hasOwnProperty("toString")&&(this.toString=e.toString)},clone:function(){return this.init.prototype.extend(this)}},o=i.WordArray=s.extend({init:function(e,t){e=this.words=e||[],this.sigBytes=void 0!=t?t:4*e.length},toString:function(e){return(e||c).stringify(this)},concat:function(e){var t=this.words,n=e.words,i=this.sigBytes;if(e=e.sigBytes,this.clamp(),i%4)for(var r=0;r<e;r++)t[i+r>>>2]|=(n[r>>>2]>>>24-r%4*8&255)<<24-(i+r)%4*8;else if(65535<n.length)for(r=0;r<e;r+=4)t[i+r>>>2]=n[r>>>2];else t.push.apply(t,n);return this.sigBytes+=e,this},clamp:function(){var t=this.words,n=this.sigBytes;t[n>>>2]&=4294967295<<32-n%4*8,t.length=e.ceil(n/4)},clone:function(){var e=s.clone.call(this);return e.words=this.words.slice(0),e},random:function(t){for(var n=[],i=0;i<t;i+=4)n.push(4294967296*e.random()|0);return new o.init(n,t)}}),a=n.enc={},c=a.Hex={stringify:function(e){var t=e.words;e=e.sigBytes;for(var n=[],i=0;i<e;i++){var r=t[i>>>2]>>>24-i%4*8&255;n.push((r>>>4).toString(16)),n.push((15&r).toString(16))}return n.join("")},parse:function(e){for(var t=e.length,n=[],i=0;i<t;i+=2)n[i>>>3]|=parseInt(e.substr(i,2),16)<<24-i%8*4;return new o.init(n,t/2)}},u=a.Latin1={stringify:function(e){var t=e.words;e=e.sigBytes;for(var n=[],i=0;i<e;i++)n.push(String.fromCharCode(t[i>>>2]>>>24-i%4*8&255));return n.join("")},parse:function(e){for(var t=e.length,n=[],i=0;i<t;i++)n[i>>>2]|=(255&e.charCodeAt(i))<<24-i%4*8;return new o.init(n,t)}},h=a.Utf8={stringify:function(e){try{return decodeURIComponent(escape(u.stringify(e)))}catch(e){throw Error("Malformed UTF-8 data")}},parse:function(e){return u.parse(unescape(encodeURIComponent(e)))}},l=i.BufferedBlockAlgorithm=s.extend({reset:function(){this._data=new o.init,this._nDataBytes=0},_append:function(e){"string"==typeof e&&(e=h.parse(e)),this._data.concat(e),this._nDataBytes+=e.sigBytes},_process:function(t){var n=this._data,i=n.words,r=n.sigBytes,s=this.blockSize,a=r/(4*s);if(t=(a=t?e.ceil(a):e.max((0|a)-this._minBufferSize,0))*s,r=e.min(4*t,r),t){for(var c=0;c<t;c+=s)this._doProcessBlock(i,c);c=i.splice(0,t),n.sigBytes-=r}return new o.init(c,r)},clone:function(){var e=s.clone.call(this);return e._data=this._data.clone(),e},_minBufferSize:0});i.Hasher=l.extend({cfg:s.extend(),init:function(e){this.cfg=this.cfg.extend(e),this.reset()},reset:function(){l.reset.call(this),this._doReset()},update:function(e){return this._append(e),this._process(),this},finalize:function(e){return e&&this._append(e),this._doFinalize()},blockSize:16,_createHelper:function(e){return function(t,n){return new e.init(n).finalize(t)}},_createHmacHelper:function(e){return function(t,n){return new f.HMAC.init(e,n).finalize(t)}}});var f=n.algo={};return n}(Math);!function(e){for(var t=f,n=(r=t.lib).WordArray,i=r.Hasher,r=t.algo,s=[],o=[],a=function(e){return 4294967296*(e-(0|e))|0},c=2,u=0;64>u;){var h;e:{h=c;for(var l=e.sqrt(h),p=2;p<=l;p++)if(!(h%p)){h=!1;break e}h=!0}h&&(8>u&&(s[u]=a(e.pow(c,.5))),o[u]=a(e.pow(c,1/3)),u++),c++}var d=[];r=r.SHA256=i.extend({_doReset:function(){this._hash=new n.init(s.slice(0))},_doProcessBlock:function(e,t){for(var n=this._hash.words,i=n[0],r=n[1],s=n[2],a=n[3],c=n[4],u=n[5],h=n[6],l=n[7],f=0;64>f;f++){if(16>f)d[f]=0|e[t+f];else{var p=d[f-15],g=d[f-2];d[f]=((p<<25|p>>>7)^(p<<14|p>>>18)^p>>>3)+d[f-7]+((g<<15|g>>>17)^(g<<13|g>>>19)^g>>>10)+d[f-16]}p=l+((c<<26|c>>>6)^(c<<21|c>>>11)^(c<<7|c>>>25))+(c&u^~c&h)+o[f]+d[f],g=((i<<30|i>>>2)^(i<<19|i>>>13)^(i<<10|i>>>22))+(i&r^i&s^r&s),l=h,h=u,u=c,c=a+p|0,a=s,s=r,r=i,i=p+g|0}n[0]=n[0]+i|0,n[1]=n[1]+r|0,n[2]=n[2]+s|0,n[3]=n[3]+a|0,n[4]=n[4]+c|0,n[5]=n[5]+u|0,n[6]=n[6]+h|0,n[7]=n[7]+l|0},_doFinalize:function(){var t=this._data,n=t.words,i=8*this._nDataBytes,r=8*t.sigBytes;return n[r>>>5]|=128<<24-r%32,n[14+(r+64>>>9<<4)]=e.floor(i/4294967296),n[15+(r+64>>>9<<4)]=i,t.sigBytes=4*n.length,this._process(),this._hash},clone:function(){var e=i.clone.call(this);return e._hash=this._hash.clone(),e}});t.SHA256=i._createHelper(r),t.HmacSHA256=i._createHmacHelper(r)}(Math),i=(n=f).enc.Utf8,n.algo.HMAC=n.lib.Base.extend({init:function(e,t){e=this._hasher=new e.init,"string"==typeof t&&(t=i.parse(t));var n=e.blockSize,r=4*n;t.sigBytes>r&&(t=e.finalize(t)),t.clamp();for(var s=this._oKey=t.clone(),o=this._iKey=t.clone(),a=s.words,c=o.words,u=0;u<n;u++)a[u]^=1549556828,c[u]^=909522486;s.sigBytes=o.sigBytes=r,this.reset()},reset:function(){var e=this._hasher;e.reset(),e.update(this._iKey)},update:function(e){return this._hasher.update(e),this},finalize:function(e){var t=this._hasher;return e=t.finalize(e),t.reset(),t.finalize(this._oKey.clone().concat(e))}}),s=(r=f).lib.WordArray,r.enc.Base64={stringify:function(e){var t=e.words,n=e.sigBytes,i=this._map;e.clamp(),e=[];for(var r=0;r<n;r+=3)for(var s=(t[r>>>2]>>>24-r%4*8&255)<<16|(t[r+1>>>2]>>>24-(r+1)%4*8&255)<<8|t[r+2>>>2]>>>24-(r+2)%4*8&255,o=0;4>o&&r+.75*o<n;o++)e.push(i.charAt(s>>>6*(3-o)&63));if(t=i.charAt(64))for(;e.length%4;)e.push(t);return e.join("")},parse:function(e){var t=e.length,n=this._map;(i=n.charAt(64))&&-1!=(i=e.indexOf(i))&&(t=i);for(var i=[],r=0,o=0;o<t;o++)if(o%4){var a=n.indexOf(e.charAt(o-1))<<o%4*2,c=n.indexOf(e.charAt(o))>>>6-o%4*2;i[r>>>2]|=(a|c)<<24-r%4*8,r++}return s.create(i,r)},_map:"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="},function(e){function t(e,t,n,i,r,s,o){return((e=e+(t&n|~t&i)+r+o)<<s|e>>>32-s)+t}function n(e,t,n,i,r,s,o){return((e=e+(t&i|n&~i)+r+o)<<s|e>>>32-s)+t}function i(e,t,n,i,r,s,o){return((e=e+(t^n^i)+r+o)<<s|e>>>32-s)+t}function r(e,t,n,i,r,s,o){return((e=e+(n^(t|~i))+r+o)<<s|e>>>32-s)+t}for(var s=f,o=(c=s.lib).WordArray,a=c.Hasher,c=s.algo,u=[],h=0;64>h;h++)u[h]=4294967296*e.abs(e.sin(h+1))|0;c=c.MD5=a.extend({_doReset:function(){this._hash=new o.init([1732584193,4023233417,2562383102,271733878])},_doProcessBlock:function(e,s){for(var o=0;16>o;o++){var a=e[l=s+o];e[l]=16711935&(a<<8|a>>>24)|4278255360&(a<<24|a>>>8)}o=this._hash.words;var c,h,l=e[s+0],f=(a=e[s+1],e[s+2]),p=e[s+3],d=e[s+4],g=e[s+5],y=e[s+6],m=e[s+7],v=e[s+8],b=e[s+9],w=e[s+10],S=e[s+11],C=e[s+12],I=e[s+13],_=e[s+14],x=e[s+15],E=o[0],k=r(k=r(k=r(k=r(k=i(k=i(k=i(k=i(k=n(k=n(k=n(k=n(k=t(k=t(k=t(k=t(k=o[1],h=t(h=o[2],c=t(c=o[3],E=t(E,k,h,c,l,7,u[0]),k,h,a,12,u[1]),E,k,f,17,u[2]),c,E,p,22,u[3]),h=t(h,c=t(c,E=t(E,k,h,c,d,7,u[4]),k,h,g,12,u[5]),E,k,y,17,u[6]),c,E,m,22,u[7]),h=t(h,c=t(c,E=t(E,k,h,c,v,7,u[8]),k,h,b,12,u[9]),E,k,w,17,u[10]),c,E,S,22,u[11]),h=t(h,c=t(c,E=t(E,k,h,c,C,7,u[12]),k,h,I,12,u[13]),E,k,_,17,u[14]),c,E,x,22,u[15]),h=n(h,c=n(c,E=n(E,k,h,c,a,5,u[16]),k,h,y,9,u[17]),E,k,S,14,u[18]),c,E,l,20,u[19]),h=n(h,c=n(c,E=n(E,k,h,c,g,5,u[20]),k,h,w,9,u[21]),E,k,x,14,u[22]),c,E,d,20,u[23]),h=n(h,c=n(c,E=n(E,k,h,c,b,5,u[24]),k,h,_,9,u[25]),E,k,p,14,u[26]),c,E,v,20,u[27]),h=n(h,c=n(c,E=n(E,k,h,c,I,5,u[28]),k,h,f,9,u[29]),E,k,m,14,u[30]),c,E,C,20,u[31]),h=i(h,c=i(c,E=i(E,k,h,c,g,4,u[32]),k,h,v,11,u[33]),E,k,S,16,u[34]),c,E,_,23,u[35]),h=i(h,c=i(c,E=i(E,k,h,c,a,4,u[36]),k,h,d,11,u[37]),E,k,m,16,u[38]),c,E,w,23,u[39]),h=i(h,c=i(c,E=i(E,k,h,c,I,4,u[40]),k,h,l,11,u[41]),E,k,p,16,u[42]),c,E,y,23,u[43]),h=i(h,c=i(c,E=i(E,k,h,c,b,4,u[44]),k,h,C,11,u[45]),E,k,x,16,u[46]),c,E,f,23,u[47]),h=r(h,c=r(c,E=r(E,k,h,c,l,6,u[48]),k,h,m,10,u[49]),E,k,_,15,u[50]),c,E,g,21,u[51]),h=r(h,c=r(c,E=r(E,k,h,c,C,6,u[52]),k,h,p,10,u[53]),E,k,w,15,u[54]),c,E,a,21,u[55]),h=r(h,c=r(c,E=r(E,k,h,c,v,6,u[56]),k,h,x,10,u[57]),E,k,y,15,u[58]),c,E,I,21,u[59]),h=r(h,c=r(c,E=r(E,k,h,c,d,6,u[60]),k,h,S,10,u[61]),E,k,f,15,u[62]),c,E,b,21,u[63]);o[0]=o[0]+E|0,o[1]=o[1]+k|0,o[2]=o[2]+h|0,o[3]=o[3]+c|0},_doFinalize:function(){var t=this._data,n=t.words,i=8*this._nDataBytes,r=8*t.sigBytes;n[r>>>5]|=128<<24-r%32;var s=e.floor(i/4294967296);for(n[15+(r+64>>>9<<4)]=16711935&(s<<8|s>>>24)|4278255360&(s<<24|s>>>8),n[14+(r+64>>>9<<4)]=16711935&(i<<8|i>>>24)|4278255360&(i<<24|i>>>8),t.sigBytes=4*(n.length+1),this._process(),n=(t=this._hash).words,i=0;4>i;i++)r=n[i],n[i]=16711935&(r<<8|r>>>24)|4278255360&(r<<24|r>>>8);return t},clone:function(){var e=a.clone.call(this);return e._hash=this._hash.clone(),e}}),s.MD5=a._createHelper(c),s.HmacMD5=a._createHmacHelper(c)}(Math),c=(o=(a=f).lib).Base,u=o.WordArray,h=(o=a.algo).EvpKDF=c.extend({cfg:c.extend({keySize:4,hasher:o.MD5,iterations:1}),init:function(e){this.cfg=this.cfg.extend(e)},compute:function(e,t){for(var n=(o=this.cfg).hasher.create(),i=u.create(),r=i.words,s=o.keySize,o=o.iterations;r.length<s;){a&&n.update(a);var a=n.update(e).finalize(t);n.reset();for(var c=1;c<o;c++)a=n.finalize(a),n.reset();i.concat(a)}return i.sigBytes=4*s,i}}),a.EvpKDF=function(e,t,n){return h.create(n).compute(e,t)},f.lib.Cipher||function(e){var t=(d=f).lib,n=t.Base,i=t.WordArray,r=t.BufferedBlockAlgorithm,s=d.enc.Base64,o=d.algo.EvpKDF,a=t.Cipher=r.extend({cfg:n.extend(),createEncryptor:function(e,t){return this.create(this._ENC_XFORM_MODE,e,t)},createDecryptor:function(e,t){return this.create(this._DEC_XFORM_MODE,e,t)},init:function(e,t,n){this.cfg=this.cfg.extend(n),this._xformMode=e,this._key=t,this.reset()},reset:function(){r.reset.call(this),this._doReset()},process:function(e){return this._append(e),this._process()},finalize:function(e){return e&&this._append(e),this._doFinalize()},keySize:4,ivSize:4,_ENC_XFORM_MODE:1,_DEC_XFORM_MODE:2,_createHelper:function(e){return{encrypt:function(t,n,i){return("string"==typeof n?g:p).encrypt(e,t,n,i)},decrypt:function(t,n,i){return("string"==typeof n?g:p).decrypt(e,t,n,i)}}}});t.StreamCipher=a.extend({_doFinalize:function(){return this._process(!0)},blockSize:1});var c=d.mode={},u=function(e,t,n){var i=this._iv;i?this._iv=void 0:i=this._prevBlock;for(var r=0;r<n;r++)e[t+r]^=i[r]},h=(t.BlockCipherMode=n.extend({createEncryptor:function(e,t){return this.Encryptor.create(e,t)},createDecryptor:function(e,t){return this.Decryptor.create(e,t)},init:function(e,t){this._cipher=e,this._iv=t}})).extend();h.Encryptor=h.extend({processBlock:function(e,t){var n=this._cipher,i=n.blockSize;u.call(this,e,t,i),n.encryptBlock(e,t),this._prevBlock=e.slice(t,t+i)}}),h.Decryptor=h.extend({processBlock:function(e,t){var n=this._cipher,i=n.blockSize,r=e.slice(t,t+i);n.decryptBlock(e,t),u.call(this,e,t,i),this._prevBlock=r}}),c=c.CBC=h,h=(d.pad={}).Pkcs7={pad:function(e,t){for(var n,r=(n=(n=4*t)-e.sigBytes%n)<<24|n<<16|n<<8|n,s=[],o=0;o<n;o+=4)s.push(r);n=i.create(s,n),e.concat(n)},unpad:function(e){e.sigBytes-=255&e.words[e.sigBytes-1>>>2]}},t.BlockCipher=a.extend({cfg:a.cfg.extend({mode:c,padding:h}),reset:function(){a.reset.call(this);var e=(t=this.cfg).iv,t=t.mode;if(this._xformMode==this._ENC_XFORM_MODE)var n=t.createEncryptor;else n=t.createDecryptor,this._minBufferSize=1;this._mode=n.call(t,this,e&&e.words)},_doProcessBlock:function(e,t){this._mode.processBlock(e,t)},_doFinalize:function(){var e=this.cfg.padding;if(this._xformMode==this._ENC_XFORM_MODE){e.pad(this._data,this.blockSize);var t=this._process(!0)}else t=this._process(!0),e.unpad(t);return t},blockSize:4});var l=t.CipherParams=n.extend({init:function(e){this.mixIn(e)},toString:function(e){return(e||this.formatter).stringify(this)}}),p=(c=(d.format={}).OpenSSL={stringify:function(e){var t=e.ciphertext;return((e=e.salt)?i.create([1398893684,1701076831]).concat(e).concat(t):t).toString(s)},parse:function(e){var t=(e=s.parse(e)).words;if(1398893684==t[0]&&1701076831==t[1]){var n=i.create(t.slice(2,4));t.splice(0,4),e.sigBytes-=16}return l.create({ciphertext:e,salt:n})}},t.SerializableCipher=n.extend({cfg:n.extend({format:c}),encrypt:function(e,t,n,i){i=this.cfg.extend(i);var r=e.createEncryptor(n,i);return t=r.finalize(t),r=r.cfg,l.create({ciphertext:t,key:n,iv:r.iv,algorithm:e,mode:r.mode,padding:r.padding,blockSize:e.blockSize,formatter:i.format})},decrypt:function(e,t,n,i){return i=this.cfg.extend(i),t=this._parse(t,i.format),e.createDecryptor(n,i).finalize(t.ciphertext)},_parse:function(e,t){return"string"==typeof e?t.parse(e,this):e}})),d=(d.kdf={}).OpenSSL={execute:function(e,t,n,r){return r||(r=i.random(8)),e=o.create({keySize:t+n}).compute(e,r),n=i.create(e.words.slice(t),4*n),e.sigBytes=4*t,l.create({key:e,iv:n,salt:r})}},g=t.PasswordBasedCipher=p.extend({cfg:p.cfg.extend({kdf:d}),encrypt:function(e,t,n,i){return n=(i=this.cfg.extend(i)).kdf.execute(n,e.keySize,e.ivSize),i.iv=n.iv,(e=p.encrypt.call(this,e,t,n.key,i)).mixIn(n),e},decrypt:function(e,t,n,i){return i=this.cfg.extend(i),t=this._parse(t,i.format),n=i.kdf.execute(n,e.keySize,e.ivSize,t.salt),i.iv=n.iv,p.decrypt.call(this,e,t,n.key,i)}})}(),function(){for(var e=f,t=e.lib.BlockCipher,n=e.algo,i=[],r=[],s=[],o=[],a=[],c=[],u=[],h=[],l=[],p=[],d=[],g=0;256>g;g++)d[g]=128>g?g<<1:g<<1^283;var y=0,m=0;for(g=0;256>g;g++){var v=(v=m^m<<1^m<<2^m<<3^m<<4)>>>8^255&v^99;i[y]=v,r[v]=y;var b=d[y],w=d[b],S=d[w],C=257*d[v]^16843008*v;s[y]=C<<24|C>>>8,o[y]=C<<16|C>>>16,a[y]=C<<8|C>>>24,c[y]=C,C=16843009*S^65537*w^257*b^16843008*y,u[v]=C<<24|C>>>8,h[v]=C<<16|C>>>16,l[v]=C<<8|C>>>24,p[v]=C,y?(y=b^d[d[d[S^b]]],m^=d[d[m]]):y=m=1}var I=[0,1,2,4,8,16,32,64,128,27,54];n=n.AES=t.extend({_doReset:function(){for(var e=(n=this._key).words,t=n.sigBytes/4,n=4*((this._nRounds=t+6)+1),r=this._keySchedule=[],s=0;s<n;s++)if(s<t)r[s]=e[s];else{var o=r[s-1];s%t?6<t&&4==s%t&&(o=i[o>>>24]<<24|i[o>>>16&255]<<16|i[o>>>8&255]<<8|i[255&o]):(o=i[(o=o<<8|o>>>24)>>>24]<<24|i[o>>>16&255]<<16|i[o>>>8&255]<<8|i[255&o],o^=I[s/t|0]<<24),r[s]=r[s-t]^o}for(e=this._invKeySchedule=[],t=0;t<n;t++)s=n-t,o=t%4?r[s]:r[s-4],e[t]=4>t||4>=s?o:u[i[o>>>24]]^h[i[o>>>16&255]]^l[i[o>>>8&255]]^p[i[255&o]]},encryptBlock:function(e,t){this._doCryptBlock(e,t,this._keySchedule,s,o,a,c,i)},decryptBlock:function(e,t){var n=e[t+1];e[t+1]=e[t+3],e[t+3]=n,this._doCryptBlock(e,t,this._invKeySchedule,u,h,l,p,r),n=e[t+1],e[t+1]=e[t+3],e[t+3]=n},_doCryptBlock:function(e,t,n,i,r,s,o,a){for(var c=this._nRounds,u=e[t]^n[0],h=e[t+1]^n[1],l=e[t+2]^n[2],f=e[t+3]^n[3],p=4,d=1;d<c;d++){var g=i[u>>>24]^r[h>>>16&255]^s[l>>>8&255]^o[255&f]^n[p++],y=i[h>>>24]^r[l>>>16&255]^s[f>>>8&255]^o[255&u]^n[p++],m=i[l>>>24]^r[f>>>16&255]^s[u>>>8&255]^o[255&h]^n[p++];f=i[f>>>24]^r[u>>>16&255]^s[h>>>8&255]^o[255&l]^n[p++],u=g,h=y,l=m}g=(a[u>>>24]<<24|a[h>>>16&255]<<16|a[l>>>8&255]<<8|a[255&f])^n[p++],y=(a[h>>>24]<<24|a[l>>>16&255]<<16|a[f>>>8&255]<<8|a[255&u])^n[p++],m=(a[l>>>24]<<24|a[f>>>16&255]<<16|a[u>>>8&255]<<8|a[255&h])^n[p++],f=(a[f>>>24]<<24|a[u>>>16&255]<<16|a[h>>>8&255]<<8|a[255&l])^n[p++],e[t]=g,e[t+1]=y,e[t+2]=m,e[t+3]=f},keySize:8});e.AES=t._createHelper(n)}(),f.mode.ECB=((l=f.lib.BlockCipherMode.extend()).Encryptor=l.extend({processBlock:function(e,t){this._cipher.encryptBlock(e,t)}}),l.Decryptor=l.extend({processBlock:function(e,t){this._cipher.decryptBlock(e,t)}}),l),e.exports=f},function(e,t,n){var i=n(5),r=n(6),s=n(7),o=1,a=!1,c=[],u="-pnpres",h=10,l=310,f=60,p=1e3,d=5,g=30,y=i.version;function m(){return"x"+ ++o+ +new Date}var v,b=(v=Math.floor(20*Math.random()),function(e){var t=e.split("://")[0],n=e.split("://")[1];return n.match("^ps")?t+"://"+n.replace("ps","ps"+(++v<20?v:v=1)):n.match("^pubsub")?t+"://"+n.replace("pubsub","ps"+(++v<20?v:v=1)):e});function w(e,t){var n=[];return s.each(e,function(e,i){t?e.search("-pnpres")<0&&i.subscribed&&n.push(e):i.subscribed&&n.push(e)}),n.sort()}function S(e,t){var n=[];return s.each(e,function(e,i){t?e.search("-pnpres")<0&&i.subscribed&&n.push(e):i.subscribed&&n.push(e)}),n.sort()}function C(){a||(a=1,s.each(c,function(e){e()}))}e.exports={PN_API:function(e){var t,n,i=+e.windowing||h,r=(+e.timeout||l)*p,o=(+e.keepalive||f)*p,v=e.timecheck||0,I=e.noleave||0,_=e.publish_key,x=e.subscribe_key,E=e.auth_key||"",k=e.secret_key||"",D=e.hmac_SHA256,O=e.ssl?"s":"",B="http"+O+"://"+(e.origin||"pubsub.pubnub.com"),T=b(B),A=b(B),M=function(){},P=[],N=!0,R=0,j=0,U=0,L=0,K=e.restore||0,H=0,z=!1,F={},G={},V={},J=null,W=ge(e.heartbeat||e.pnexpires||0,e.error),X=e.heartbeat_interval||W/2-1,q=!1,Q=e.no_wait_for_pending,Y=e["compatible_3.5"]||!1,$=e.xdr,Z=e.params||{},ee=e.error||function(){},te=e._is_online||function(){return 1},ne=e.jsonp_cb||function(){return 0},ie=e.db||{get:function(){},set:function(){}},re=e.cipher_key,se=e.uuid||!e.unique_uuid&&ie&&ie.get(x+"uuid")||"",oe=e.instance_id||!1,ae=e.partner_id,ce=e.sdk_family,ue="",he=e.shutdown,le=void 0===e.use_send_beacon||e.use_send_beacon?e.sendBeacon:null;2===W&&(X=1);var fe=e.crypto_obj||{encrypt:function(e,t){return e},decrypt:function(e,t){return e}};function pe(e){var t;return e||(e={}),s.each(Z,function(t,n){t in e||(e[t]=n)}),e.pnsdk=(t="PubNub-JS-"+ce,ae&&(t+="-"+ae),t+="/"+y),e}function de(e){return(t=e,n=[],s.each(t,function(e,t){n.push(e)}),n).sort();var t,n}function ge(e,t,n){var i=!1;if(void 0===e)return t;if("number"==typeof e)i=!(e>d||0==e);else{if("boolean"==typeof e)return e?g:0;i=!0}return i?(n&&n("Presence Heartbeat value invalid. Valid range ( x > "+d+" or x = 0). Current Value : "+(t||d)),t||d):e}function ye(e,t){return fe.encrypt(e,t||re)||e}function me(e,t){return fe.decrypt(e,t||re)||fe.decrypt(e,re)||e}function ve(){clearTimeout(J),!X||X>=500||X<1||!w(F,!0).length&&!S(G,!0).length?q=!1:(q=!0,ke.presence_heartbeat({callback:function(e){J=s.timeout(ve,X*p)},error:function(e){ee&&ee("Presence Heartbeat unable to reach Pubnub servers."+JSON.stringify(e)),J=s.timeout(ve,X*p)}}))}function be(){!q&&ve()}function we(e){if(Q){if(!P.length)return}else{if(e&&(P.sending=0),P.sending||!P.length)return;P.sending=1}xe(P.shift())}function Se(e){var t=0;return s.each(S(G),function(n){var i=G[n];i&&(t++,(e||function(){})(i))}),t}function Ce(e){var t=0;return s.each(w(F),function(n){var i=F[n];i&&(t++,(e||function(){})(i))}),t}function Ie(e,t,n){if("object"==typeof e){if(e.error){var i={};return e.message&&(i.message=e.message),e.payload&&(i.payload=e.payload),void(n&&n(i))}if(e.payload)return void(e.next_page?t&&t(e.payload,e.next_page):t&&t(e.payload))}t&&t(e)}function _e(e,t){if("object"==typeof e&&e.error){var n={};return e.message&&(n.message=e.message),e.payload&&(n.payload=e.payload),void(t&&t(n))}t&&t(e)}function xe(e){var t=e.operation,n=Math.floor((new Date).getTime()/1e3),i=e.data||{};if(k){i.auth||delete i.auth,i.timestamp=n;var r=x+"\n"+_+"\n";if("PNAccessManagerGrant"===t)r+="grant\n";else if("PNAccessManagerAudit"===t)r+="audit\n";else{var o=e.url.slice();o.shift(),r+="/"+o.join("/")+"\n"}r+=function(e){var t="",n=de(e);for(var i in n){var r=n[i];t+=r+"="+s.pamEncode(e[r]),i!=n.length-1&&(t+="&")}return t}(i);var a=D(r,k);a=(a=a.replace(/\+/g,"-")).replace(/\//g,"_"),i.signature=a,e.data=i}return $(e)}function Ee(e,t,n,i){t=e.callback||t;var r=e.error||ee,s=ne();(i=i||{}).auth||(i.auth=e.auth_key||E);var o=[T,"v1","channel-registration","sub-key",x];o.push.apply(o,n),s&&(i.callback=s),xe({callback:s,data:pe(i),success:function(e){Ie(e,t,r)},fail:function(e){_e(e,r)},url:o})}var ke={LEAVE:function(e,t,n,i,r){var o,a,c={uuid:se,auth:n||E},h=b(B),l=(i=i||function(){},r||function(){}),f=ne();if(e.indexOf(u)>0)return!0;if(Y){if(!O)return!1;if("0"==f)return!1}if(I)return!1;if("0"!=f&&(c.callback=f),oe&&(c.instanceid=ue),o=[h,"v2","presence","sub_key",x,"channel",s.encode(e),"leave"],a=pe(c),le){var p=s.buildURL(o,a);if(le(p))return i&&i({status:200,action:"leave",message:"OK",service:"Presence"}),!0}return xe({blocking:t||O,callback:f,data:a,success:function(e){Ie(e,i,l)},fail:function(e){_e(e,l)},url:o}),!0},LEAVE_GROUP:function(e,t,n,i,r){var o,a,c={uuid:se,auth:n||E},h=b(B),l=(i=i||function(){},r||function(){}),f=ne();if(e.indexOf(u)>0)return!0;if(Y){if(!O)return!1;if("0"==f)return!1}if(I)return!1;if("0"!=f&&(c.callback=f),e&&e.length>0&&(c["channel-group"]=e),oe&&(c.instanceid=ue),o=[h,"v2","presence","sub_key",x,"channel",s.encode(","),"leave"],a=pe(c),le){var p=s.buildURL(o,a);if(le(p))return i&&i({status:200,action:"leave",message:"OK",service:"Presence"}),!0}return xe({blocking:t||O,callback:f,data:a,success:function(e){Ie(e,i,l)},fail:function(e){_e(e,l)},url:o}),!0},set_resumed:function(e){z=e},get_cipher_key:function(){return re},set_cipher_key:function(e){re=e},raw_encrypt:function(e,t){return ye(e,t)},raw_decrypt:function(e,t){return me(e,t)},get_heartbeat:function(){return W},set_heartbeat:function(e,t){W=ge(e,W,ee),X=t||W/2-1,2==W&&(X=1),M(),ve()},get_heartbeat_interval:function(){return X},set_heartbeat_interval:function(e){X=e,ve()},get_version:function(){return y},getGcmMessageObject:function(e){return{data:e}},getApnsMessageObject:function(e){var t={aps:{badge:1,alert:""}};for(var n in e)n[t]=e[n];return t},_add_param:function(e,t){Z[e]=t},channel_group:function(e,t){var n,i,r=e.channel_group,o=(t=t||e.callback,e.channels||e.channel),a=e.cloak,c=[],u={},h=e.mode||"add";if(r){var l=r.split(":");l.length>1?(n="*"===l[0]?null:l[0],i=l[1]):i=l[0]}n&&c.push("namespace")&&c.push(s.encode(n)),c.push("channel-group"),i&&"*"!==i&&c.push(i),o?(s.isArray(o)&&(o=o.join(",")),u[h]=o,u.cloak=N?"true":"false"):"remove"===h&&c.push("remove"),void 0!==a&&(u.cloak=a?"true":"false"),Ee(e,t,c,u)},channel_group_list_groups:function(e,t){var n;(n=e.namespace||e.ns||e.channel_group||null)&&(e.channel_group=n+":*"),ke.channel_group(e,t)},channel_group_list_channels:function(e,t){if(!e.channel_group)return ee("Missing Channel Group");ke.channel_group(e,t)},channel_group_remove_channel:function(e,t){return e.channel_group?e.channel||e.channels?(e.mode="remove",void ke.channel_group(e,t)):ee("Missing Channel"):ee("Missing Channel Group")},channel_group_remove_group:function(e,t){return e.channel_group?e.channel?ee("Use channel_group_remove_channel if you want to remove a channel from a group."):(e.mode="remove",void ke.channel_group(e,t)):ee("Missing Channel Group")},channel_group_add_channel:function(e,t){return e.channel_group?e.channel||e.channels?void ke.channel_group(e,t):ee("Missing Channel"):ee("Missing Channel Group")},channel_group_cloak:function(e,t){void 0!==e.cloak?(N=e.cloak,ke.channel_group(e,t)):t(N)},channel_group_list_namespaces:function(e,t){Ee(e,t,["namespace"])},channel_group_remove_namespace:function(e,t){Ee(e,t,["namespace",e.namespace,"remove"])},history:function(e,t){t=e.callback||t;var n=e.count||e.limit||100,i=e.reverse||"false",r=e.error||function(){},o=e.auth_key||E,a=e.cipher_key,c=e.channel,u=e.channel_group,h=e.start,l=e.end,f=e.include_token,p=e.string_message_token||!1,d={},g=ne();return c||u?t?x?(d.stringtoken="true",d.count=n,d.reverse=i,d.auth=o,u&&(d["channel-group"]=u,c||(c=",")),g&&(d.callback=g),h&&(d.start=h),l&&(d.end=l),f&&(d.include_token="true"),p&&(d.string_message_token="true"),void xe({callback:g,data:pe(d),success:function(e){if("object"==typeof e&&e.error)r({message:e.message,payload:e.payload});else{for(var n=e[0],i=[],s=0;s<n.length;s++)if(f){var o=me(n[s].message,a),c=n[s].timetoken;try{i.push({message:JSON.parse(o),timetoken:c})}catch(e){i.push({message:o,timetoken:c})}}else{o=me(n[s],a);try{i.push(JSON.parse(o))}catch(e){i.push(o)}}t([i,e[1],e[2]])}},fail:function(e){_e(e,r)},url:[T,"v2","history","sub-key",x,"channel",s.encode(c)]})):ee("Missing Subscribe Key"):ee("Missing Callback"):ee("Missing Channel")},replay:function(e,t){t=t||e.callback||function(){};var n=e.auth_key||E,i=e.source,r=e.destination,s=e.error||e.error||function(){},o=e.stop,a=e.start,c=e.end,u=e.reverse,h=e.limit,l=ne(),f={};return i?r?_?x?("0"!=l&&(f.callback=l),o&&(f.stop="all"),u&&(f.reverse="true"),a&&(f.start=a),c&&(f.end=c),h&&(f.count=h),f.auth=n,void xe({callback:l,success:function(e){Ie(e,t,s)},fail:function(){t([0,"Disconnected"])},url:[T,"v1","replay",_,x,i,r],data:pe(f)})):ee("Missing Subscribe Key"):ee("Missing Publish Key"):ee("Missing Destination Channel"):ee("Missing Source Channel")},auth:function(e){E=e,M()},time:function(e){var t=ne(),n={uuid:se,auth:E};oe&&(n.instanceid=ue),xe({callback:t,data:pe(n),url:[T,"time",t],success:function(t){e(t[0])},fail:function(){e(0)}})},publish:function(e,t){var n=e.message;if(!n)return ee("Missing Message");t=t||e.callback||n.callback||e.success||function(){};var i,r,o=e.channel||n.channel,a=e.meta||e.metadata,c=e.auth_key||E,u=e.cipher_key,h=e.error||n.error||function(){},l=e.post||!1,f=!("store_in_history"in e)||e.store_in_history,p=!("replicate"in e)||e.replicate,d=ne(),g="push";return e.prepend&&(g="unshift"),o?_?x?(n.getPubnubMessage&&(n=n.getPubnubMessage()),n=JSON.stringify(ye(n,u)),r=[T,"publish",_,x,0,s.encode(o),d,s.encode(n)],i={uuid:se,auth:c},a&&"object"==typeof a&&(i.meta=JSON.stringify(a)),f||(i.store="0"),p||(i.norep="true"),oe&&(i.instanceid=ue),P[g]({callback:d,url:r,data:pe(i),fail:function(e){_e(e,h),we(1)},success:function(e){Ie(e,t,h),we(1)},mode:l?"POST":"GET"}),void we()):ee("Missing Subscribe Key"):ee("Missing Publish Key"):ee("Missing Channel")},fire:function(e,t){e.store_in_history=!1,e.replicate=!1,ke.publish(e,t)},unsubscribe:function(e,t){var n=e.channel,i=e.channel_group,r=e.auth_key||E,o=(t=t||e.callback||function(){},e.error||function(){});if(!n&&!i)return ee("Missing Channel or Channel Group");if(!x)return ee("Missing Subscribe Key");if(n){var c=s.isArray(n)?n:(""+n).split(","),h=[],l=[];if(s.each(c,function(e){F[e]&&h.push(e)}),0==h.length)return void t({action:"leave"});s.each(h,function(e){l.push(e+u)}),s.each(h.concat(l),function(e){e in F&&delete F[e],e in V&&delete V[e]}),0===F.length&&0===G.length&&(H=0);var f=!0;a&&(f=ke.LEAVE(h.join(","),0,r,t,o)),f||t({action:"leave"})}if(i){var p=s.isArray(i)?i:(""+i).split(","),d=[],g=[];if(s.each(p,function(e){G[e]&&d.push(e)}),0==d.length)return void t({action:"leave"});s.each(d,function(e){g.push(e+u)}),s.each(d.concat(g),function(e){e in G&&delete G[e],e in V&&delete V[e]}),0===F.length&&0===G.length&&(H=0),f=!0,a&&(f=ke.LEAVE_GROUP(d.join(","),0,r,t,o)),f||t({action:"leave"})}M()},subscribe:function(e,t){var n=e.channel,o=e.channel_group,h=(t=(t=t||e.callback)||e.message,e.connect||function(){}),l=e.reconnect||function(){},f=e.disconnect||function(){},d=e.error||d||function(){},g=e.idle||function(){},y=e.presence||0,m=e.noheresync||0,v=e.backfill||0,C=e.timetoken||0,I=e.timeout||r,_=e.windowing||i,k=e.state,D=e.heartbeat||e.pnexpires,O=e.heartbeat_interval,P=e.restore||K;if(E=e.auth_key||E,K=P,H=C,!n&&!o)return ee("Missing Channel");if(!t)return ee("Missing Callback");if(!x)return ee("Missing Subscribe Key");function N(e){e?s.timeout(M,_):(T=b(B),A=b(B),s.timeout(function(){ke.time(N)},p)),Ce(function(t){if(e&&t.disconnected)return t.disconnected=0,t.reconnect(t.name);e||t.disconnected||(t.disconnected=1,t.disconnect(t.name))}),Se(function(t){if(e&&t.disconnected)return t.disconnected=0,t.reconnect(t.name);e||t.disconnected||(t.disconnected=1,t.disconnect(t.name))})}function J(){var e=ne(),t=w(F).join(","),n=S(G).join(",");if(t||n){t||(t=","),De();var i=pe({uuid:se,auth:E});n&&(i["channel-group"]=n),JSON.stringify(V).length>2&&(i.state=JSON.stringify(V)),W&&(i.heartbeat=W),oe&&(i.instanceid=ue),be(),L=xe({timeout:I,callback:e,fail:function(e){e&&e.error&&e.service?(_e(e,d),N(!1)):ke.time(function(t){!t&&_e(e,d),N(t)})},data:pe(i),url:[A,"subscribe",x,s.encode(t),e,H],success:function(e){if(!e||"object"==typeof e&&"error"in e&&e.error)return d(e),s.timeout(M,p);if(g(e[1]),H=!H&&K&&ie.get(x)||e[1],Ce(function(e){e.connected||(e.connected=1,e.connect(e.name))}),Se(function(e){e.connected||(e.connected=1,e.connect(e.name))}),z&&!K)return H=0,z=!1,ie.set(x,0),void s.timeout(J,_);v&&(H=1e4,v=0),ie.set(x,e[1]);var t,n=function(){var t="",n="";e.length>3?(t=e[3],n=e[2]):t=e.length>2?e[2]:s.map(w(F),function(t){return s.map(Array(e[0].length).join(",").split(","),function(){return t})}).join(",");var i=t.split(","),r=n?n.split(","):[];return function(){var e=i.shift()||U,t=r.shift(),n={},s={callback:function(){}};t?(e&&e.indexOf("-pnpres")>=0&&t.indexOf("-pnpres")<0&&(t+="-pnpres"),n=G[t]||F[t]||s):n=F[e]||s;var o=[n.callback||j,e.split(u)[0]];return t&&o.push(t.split(u)[0]),o}}(),i=(t=+e[1],s.rnow()-R-t/1e4);s.each(e[0],function(t){var r=n(),s=me(t,F[r[1]]?F[r[1]].cipher_key:null);r[0]&&r[0](s,e,r[2]||r[1],i,r[1])}),s.timeout(J,_)}})}}if((D||0===D||O||0===O)&&ke.set_heartbeat(D,O),n&&s.each((n.join?n.join(","):""+n).split(","),function(n){var i=F[n]||{};F[U=n]={name:n,connected:i.connected,disconnected:i.disconnected,subscribed:1,callback:j=t,cipher_key:e.cipher_key,connect:h,disconnect:f,reconnect:l},k&&(V[n]=n in k?k[n]:k),y&&(ke.subscribe({channel:n+u,callback:y,restore:P}),i.subscribed||m||ke.here_now({channel:n,data:pe({uuid:se,auth:E}),callback:function(e){s.each("uuids"in e?e.uuids:[],function(t){y({action:"join",uuid:t,timestamp:Math.floor(s.rnow()/1e3),occupancy:e.occupancy||1},e,n)})}}))}),o&&s.each((o.join?o.join(","):""+o).split(","),function(n){var i=G[n]||{};G[n]={name:n,connected:i.connected,disconnected:i.disconnected,subscribed:1,callback:j=t,cipher_key:e.cipher_key,connect:h,disconnect:f,reconnect:l},y&&(ke.subscribe({channel_group:n+u,callback:y,restore:P,auth_key:E}),i.subscribed||m||ke.here_now({channel_group:n,data:pe({uuid:se,auth:E}),callback:function(e){s.each("uuids"in e?e.uuids:[],function(t){y({action:"join",uuid:t,timestamp:Math.floor(s.rnow()/1e3),occupancy:e.occupancy||1},e,n)})}}))}),M=function(){De(),s.timeout(J,_)},!a)return c.push(M);M()},here_now:function(e,t){t=e.callback||t;var n=e.debug,i=e.error||function(){},r=e.auth_key||E,o=e.channel,a=e.channel_group,c=ne(),u=!("uuids"in e)||e.uuids,h=e.state,l={uuid:se,auth:r};if(u||(l.disable_uuids=1),h&&(l.state=1),!t)return ee("Missing Callback");if(!x)return ee("Missing Subscribe Key");var f=[T,"v2","presence","sub_key",x];o&&f.push("channel")&&f.push(s.encode(o)),"0"!=c&&(l.callback=c),a&&(l["channel-group"]=a,!o&&f.push("channel")&&f.push(",")),oe&&(l.instanceid=ue),xe({callback:c,data:pe(l),success:function(e){Ie(e,t,i)},fail:function(e){_e(e,i)},debug:n,url:f})},where_now:function(e,t){t=e.callback||t;var n=e.error||function(){},i=e.auth_key||E,r=ne(),o=e.uuid||se,a={auth:i};return t?x?("0"!=r&&(a.callback=r),oe&&(a.instanceid=ue),void xe({callback:r,data:pe(a),success:function(e){Ie(e,t,n)},fail:function(e){_e(e,n)},url:[T,"v2","presence","sub_key",x,"uuid",s.encode(o)]})):ee("Missing Subscribe Key"):ee("Missing Callback")},state:function(e,t){t=e.callback||t||function(e){};var n,i=e.error||function(){},r=e.auth_key||E,o=ne(),a=e.state,c=e.uuid||se,u=e.channel,h=e.channel_group,l=pe({auth:r});return x?c?u||h?("0"!=o&&(l.callback=o),void 0!==u&&F[u]&&F[u].subscribed&&a&&(V[u]=a),void 0!==h&&G[h]&&G[h].subscribed&&(a&&(V[h]=a),l["channel-group"]=h,u||(u=",")),l.state=JSON.stringify(a),oe&&(l.instanceid=ue),n=a?[T,"v2","presence","sub-key",x,"channel",u,"uuid",c,"data"]:[T,"v2","presence","sub-key",x,"channel",u,"uuid",s.encode(c)],void xe({callback:o,data:pe(l),success:function(e){Ie(e,t,i)},fail:function(e){_e(e,i)},url:n})):ee("Missing Channel"):ee("Missing UUID"):ee("Missing Subscribe Key")},grant:function(e,t){t=e.callback||t;var n=e.error||function(){},i=e.channel||e.channels,r=e.channel_group,o=ne(),a=e.ttl,c=e.read?"1":"0",u=e.write?"1":"0",h=e.manage?"1":"0",l=e.auth_key||e.auth_keys;if(!t)return ee("Missing Callback");if(!x)return ee("Missing Subscribe Key");if(!_)return ee("Missing Publish Key");if(!k)return ee("Missing Secret Key");var f={w:u,r:c};e.manage&&(f.m=h),s.isArray(i)&&(i=i.join(",")),s.isArray(l)&&(l=l.join(",")),void 0!==i&&null!=i&&i.length>0&&(f.channel=i),void 0!==r&&null!=r&&r.length>0&&(f["channel-group"]=r),"0"!=o&&(f.callback=o),(a||0===a)&&(f.ttl=a),l&&(f.auth=l),f=pe(f),l||delete f.auth,xe({operation:"PNAccessManagerGrant",callback:o,data:f,success:function(e){Ie(e,t,n)},fail:function(e){_e(e,n)},url:[T,"v1","auth","grant","sub-key",x]})},mobile_gw_provision:function(e){var t,n,i=e.callback||function(){},r=e.auth_key||E,s=e.error||function(){},o=ne(),a=e.channel,c=e.op,u=e.gw_type,h=e.device_id;return h?u?c?a?x?(n=[T,"v1/push/sub-key",x,"devices",h],t={uuid:se,auth:r,type:u},"add"==c?t.add=a:"remove"==c&&(t.remove=a),oe&&(t.instanceid=ue),void xe({callback:o,data:t,success:function(e){Ie(e,i,s)},fail:function(e){_e(e,s)},url:n})):ee("Missing Subscribe Key"):ee("Missing gw destination Channel (channel)"):ee("Missing GW Operation (op: add or remove)"):ee("Missing GW Type (gw_type: gcm or apns)"):ee("Missing Device ID (device_id)")},audit:function(e,t){t=e.callback||t;var n=e.error||function(){},i=e.channel,r=e.channel_group,s=e.auth_key,o=ne();if(!t)return ee("Missing Callback");if(!x)return ee("Missing Subscribe Key");if(!_)return ee("Missing Publish Key");if(!k)return ee("Missing Secret Key");var a={};"0"!=o&&(a.callback=o),void 0!==i&&null!=i&&i.length>0&&(a.channel=i),void 0!==r&&null!=r&&r.length>0&&(a["channel-group"]=r),s&&(a.auth=s),a=pe(a),s||delete a.auth,xe({operation:"PNAccessManagerAudit",callback:o,data:a,success:function(e){Ie(e,t,n)},fail:function(e){_e(e,n)},url:[T,"v1","auth","audit","sub-key",x]})},revoke:function(e,t){e.read=!1,e.write=!1,ke.grant(e,t)},set_uuid:function(e){se=e,M()},get_uuid:function(){return se},isArray:function(e){return s.isArray(e)},get_subscribed_channels:function(){return w(F,!0)},presence_heartbeat:function(e){var t=e.callback||function(){},n=e.error||function(){},i=ne(),r={uuid:se,auth:E};JSON.stringify(V).length>2&&(r.state=JSON.stringify(V)),W>0&&W<320&&(r.heartbeat=W),"0"!=i&&(r.callback=i);var o=s.encode(w(F,!0).join(",")),a=S(G,!0).join(",");o||(o=","),a&&(r["channel-group"]=a),oe&&(r.instanceid=ue),xe({callback:i,data:pe(r),url:[T,"v2","presence","sub-key",x,"channel",o,"heartbeat"],success:function(e){Ie(e,t,n)},fail:function(e){_e(e,n)}})},stop_timers:function(){clearTimeout(t),clearTimeout(n),clearTimeout(J)},shutdown:function(){ke.stop_timers(),he&&he()},xdr:$,ready:C,db:ie,uuid:s.generateUUID,map:s.map,each:s.each,"each-channel":Ce,grep:s.grep,offline:function(){De(1,{message:"Offline. Please check your network settings."})},supplant:s.supplant,now:s.rnow,unique:m,updater:s.updater};function De(e,i){L&&L(e,i),L=null,clearTimeout(t),clearTimeout(n)}function Oe(e,t){var n=s.rnow();function i(t){if(t){var i=t/1e4,r=(s.rnow()-n)/2;R=s.rnow()-(i+r),e&&e(R)}}t&&i(t)||ke.time(i)}return se||(se=ke.uuid()),ue||(ue=ke.uuid()),ie.set(x+"uuid",se),t=s.timeout(function e(){te()||De(1,{error:"Offline. Please check your network settings."}),t&&clearTimeout(t),t=s.timeout(e,p)},p),n=s.timeout(function e(){v&&ke.time(function(t){Oe(function(){},t),t||De(1,{error:"Heartbeat failed to connect to Pubnub Servers.Please check your network settings."}),n&&clearTimeout(n),n=s.timeout(e,o)})},o),J=s.timeout(be,(X-3)*p),Oe(),ke},unique:m,PNmessage:function(e){var t=e||{apns:{}};return t.getPubnubMessage=function(){var e={};if(Object.keys(t.apns).length){e.pn_apns={aps:{alert:t.apns.alert,badge:t.apns.badge,sound:t.apns.sound}};for(var n in t.apns)e.pn_apns[n]=t.apns[n];var i=["badge","alert","sound"];for(var n in i)delete e.pn_apns[i[n]]}t.gcm&&(e.pn_gcm={data:t.gcm});for(var n in t)e[n]=t[n];var r=["apns","gcm","publish","channel","callback","error"];for(var n in r)delete e[r[n]];return e},t.publish=function(){var e=t.getPubnubMessage();t.pubnub&&t.channel&&t.pubnub.publish({message:e,channel:t.channel,callback:t.callback,error:t.error})},t},DEF_TIMEOUT:15e3,timeout:s.timeout,build_url:s.buildURL,each:s.each,uuid:s.generateUUID,URLBIT:r.URLBIT,grep:s.grep,supplant:s.supplant,now:s.rnow,updater:s.updater,map:s.map}},function(e,t){e.exports={name:"pubnub",preferGlobal:!1,version:"3.16.5",author:"PubNub <support@pubnub.com>",description:"Publish & Subscribe Real-time Messaging with PubNub",contributors:[{name:"Stephen Blum",email:"stephen@pubnub.com"}],bin:{},scripts:{test:"grunt test --force"},main:"./node.js/pubnub.js",browser:"./modern/dist/pubnub.js",repository:{type:"git",url:"git://github.com/pubnub/javascript.git"},keywords:["cloud","publish","subscribe","websockets","comet","bosh","xmpp","real-time","messaging"],dependencies:{agentkeepalive:"~0.2",lodash:"^4.1.0"},noAnalyze:!1,devDependencies:{chai:"^3.5.0",eslint:"2.4.0","eslint-config-airbnb":"^6.0.2","eslint-plugin-flowtype":"^2.1.0","eslint-plugin-mocha":"^2.0.0","eslint-plugin-react":"^4.1.0","flow-bin":"^0.22.0",grunt:"^0.4.5","grunt-contrib-clean":"^1.0.0","grunt-contrib-copy":"^0.8.2","grunt-contrib-uglify":"^0.11.1","grunt-env":"^0.4.4","grunt-eslint":"^18.0.0","grunt-flow":"^1.0.3","grunt-karma":"^0.12.1","grunt-mocha-istanbul":"^3.0.1","grunt-text-replace":"^0.4.0","grunt-webpack":"^1.0.11","imports-loader":"^0.6.5",isparta:"^4.0.0","json-loader":"^0.5.4",karma:"^0.13.21","karma-chai":"^0.1.0","karma-mocha":"^0.2.1","karma-phantomjs-launcher":"^1.0.0","karma-spec-reporter":"0.0.24","load-grunt-tasks":"^3.4.0",mocha:"^2.4.5",nock:"^1.1.0","node-uuid":"^1.4.7",nodeunit:"^0.9.0","phantomjs-prebuilt":"^2.1.4",proxyquire:"^1.7.4",sinon:"^1.17.2","uglify-js":"^2.6.1",underscore:"^1.7.0",webpack:"^1.12.13","webpack-dev-server":"^1.14.1"},bundleDependencies:[],license:"MIT",engine:{node:">=0.8"},files:["core","node.js","modern","CHANGELOG","FUTURE.md","LICENSE","README.md"]}},function(e,t){e.exports={PARAMSBIT:"&",URLBIT:"/"}},function(e,t,n){var i=n(6),r=/{([\w\-]+)}/g;function s(){return+new Date}function o(e){return!!e&&"string"!=typeof e&&(Array.isArray&&Array.isArray(e)||"number"==typeof e.length)}function a(e,t){if(e&&t)if(o(e))for(var n=0,i=e.length;n<i;)t.call(e[n],e[n],n++);else for(var n in e)e.hasOwnProperty&&e.hasOwnProperty(n)&&t.call(e[n],n,e[n])}function c(e){return encodeURIComponent(e)}e.exports={buildURL:function(e,t){var n=e.join(i.URLBIT),r=[];return t?(a(t,function(e,t){var n="object"==typeof t?JSON.stringify(t):t;void 0!==t&&null!==t&&c(n).length>0&&r.push(e+"="+c(n))}),n+="?"+r.join(i.PARAMSBIT)):n},encode:c,each:a,updater:function(e,t){var n,i=0,r=function(){i+t>s()?(clearTimeout(n),n=setTimeout(r,t)):(i=s(),e())};return r},rnow:s,isArray:o,map:function(e,t){var n=[];return a(e||[],function(e,i){n.push(t(e,i))}),n},pamEncode:function(e){return encodeURIComponent(e).replace(/[!'()*~]/g,function(e){return"%"+e.charCodeAt(0).toString(16).toUpperCase()})},generateUUID:function(e){var t="xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,function(e){var t=16*Math.random()|0;return("x"===e?t:3&t|8).toString(16)});return e&&e(t),t},timeout:function(e,t){if("undefined"!=typeof setTimeout)return setTimeout(e,t)},supplant:function(e,t){return e.replace(r,function(e,n){return t[n]||e})},grep:function(e,t){var n=[];return a(e||[],function(e){t(e)&&n.push(e)}),n}}},function(e,t){var n=function(e,t){if(!(this instanceof n))return new n(e,t);var i=this,r=(e=i.url=e||"",i.protocol=t||"Sec-WebSocket-Protocol",e.split("/")),s={ssl:"wss:"===r[0],origin:r[2],publish_key:r[3],subscribe_key:r[4],channel:r[5]};if(i.CONNECTING=0,i.OPEN=1,i.CLOSING=2,i.CLOSED=3,i.CLOSE_NORMAL=1e3,i.CLOSE_GOING_AWAY=1001,i.CLOSE_PROTOCOL_ERROR=1002,i.CLOSE_UNSUPPORTED=1003,i.CLOSE_TOO_LARGE=1004,i.CLOSE_NO_STATUS=1005,i.CLOSE_ABNORMAL=1006,i.onclose=i.onerror=i.onmessage=i.onopen=i.onsend=function(){},i.binaryType="",i.extensions="",i.bufferedAmount=0,i.trasnmitting=!1,i.buffer=[],i.readyState=i.CONNECTING,!e)return i.readyState=i.CLOSED,i.onclose({code:i.CLOSE_ABNORMAL,reason:"Missing URL",wasClean:!0}),i;i.pubnub=PUBNUB.init(s),i.pubnub.setup=s,i.setup=s,i.pubnub.subscribe({restore:!1,channel:s.channel,disconnect:i.onerror,reconnect:i.onopen,error:function(){i.onclose({code:i.CLOSE_ABNORMAL,reason:"Missing URL",wasClean:!1})},callback:function(e){i.onmessage({data:e})},connect:function(){i.readyState=i.OPEN,i.onopen()}})};n.prototype.send=function(e){var t=this;t.pubnub.publish({channel:t.pubnub.setup.channel,message:e,callback:function(e){t.onsend({data:e})}})},n.prototype.close=function(){this.pubnub.unsubscribe({channel:this.pubnub.setup.channel}),this.readyState=this.CLOSED,this.onclose({})},e.exports=n}])}),function(e){if("object"==typeof exports&&"undefined"!=typeof module)module.exports=e();else if("function"==typeof define&&define.amd)define([],e);else{("undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof self?self:this).SinchClient=e()}}(function(){return function e(t,n,i){function r(o,a){if(!n[o]){if(!t[o]){var c="function"==typeof require&&require;if(!a&&c)return c(o,!0);if(s)return s(o,!0);var u=new Error("Cannot find module '"+o+"'");throw u.code="MODULE_NOT_FOUND",u}var h=n[o]={exports:{}};t[o][0].call(h.exports,function(e){var n=t[o][1][e];return r(n||e)},h,h.exports,e,t,n,i)}return n[o].exports}for(var s="function"==typeof require&&require,o=0;o<i.length;o++)r(i[o]);return r}({1:[function(e,t,n){VERSION=["1.4.12-0-g4b470dd","1.4.12","0","4b470dd",null],n.version=VERSION},{}],2:[function(e,t,n){"use strict";n.byteLength=function(e){return 3*e.length/4-u(e)},n.toByteArray=function(e){var t,n,i,o,a,c=e.length;o=u(e),a=new s(3*c/4-o),n=o>0?c-4:c;var h=0;for(t=0;t<n;t+=4)i=r[e.charCodeAt(t)]<<18|r[e.charCodeAt(t+1)]<<12|r[e.charCodeAt(t+2)]<<6|r[e.charCodeAt(t+3)],a[h++]=i>>16&255,a[h++]=i>>8&255,a[h++]=255&i;2===o?(i=r[e.charCodeAt(t)]<<2|r[e.charCodeAt(t+1)]>>4,a[h++]=255&i):1===o&&(i=r[e.charCodeAt(t)]<<10|r[e.charCodeAt(t+1)]<<4|r[e.charCodeAt(t+2)]>>2,a[h++]=i>>8&255,a[h++]=255&i);return a},n.fromByteArray=function(e){for(var t,n=e.length,r=n%3,s="",o=[],a=0,c=n-r;a<c;a+=16383)o.push(h(e,a,a+16383>c?c:a+16383));1===r?(t=e[n-1],s+=i[t>>2],s+=i[t<<4&63],s+="=="):2===r&&(t=(e[n-2]<<8)+e[n-1],s+=i[t>>10],s+=i[t>>4&63],s+=i[t<<2&63],s+="=");return o.push(s),o.join("")};for(var i=[],r=[],s="undefined"!=typeof Uint8Array?Uint8Array:Array,o="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/",a=0,c=o.length;a<c;++a)i[a]=o[a],r[o.charCodeAt(a)]=a;function u(e){var t=e.length;if(t%4>0)throw new Error("Invalid string. Length must be a multiple of 4");return"="===e[t-2]?2:"="===e[t-1]?1:0}function h(e,t,n){for(var r,s,o=[],a=t;a<n;a+=3)r=(e[a]<<16)+(e[a+1]<<8)+e[a+2],o.push(i[(s=r)>>18&63]+i[s>>12&63]+i[s>>6&63]+i[63&s]);return o.join("")}r["-".charCodeAt(0)]=62,r["_".charCodeAt(0)]=63},{}],3:[function(e,t,n){(function(e){!function(){"use strict";t.exports=function(t){return(t instanceof e?t:new e(t.toString(),"binary")).toString("base64")}}()}).call(this,e("buffer").Buffer)},{buffer:4}],4:[function(e,t,n){"use strict";var i=e("base64-js"),r=e("ieee754");n.Buffer=a,n.SlowBuffer=function(e){+e!=e&&(e=0);return a.alloc(+e)},n.INSPECT_MAX_BYTES=50;var s=2147483647;function o(e){if(e>s)throw new RangeError("Invalid typed array length");var t=new Uint8Array(e);return t.__proto__=a.prototype,t}function a(e,t,n){if("number"==typeof e){if("string"==typeof t)throw new Error("If encoding is specified then the first argument must be a string");return h(e)}return c(e,t,n)}function c(e,t,n){if("number"==typeof e)throw new TypeError('"value" argument must not be a number');return R(e)?function(e,t,n){if(t<0||e.byteLength<t)throw new RangeError("'offset' is out of bounds");if(e.byteLength<t+(n||0))throw new RangeError("'length' is out of bounds");var i;i=void 0===t&&void 0===n?new Uint8Array(e):void 0===n?new Uint8Array(e,t):new Uint8Array(e,t,n);return i.__proto__=a.prototype,i}(e,t,n):"string"==typeof e?function(e,t){"string"==typeof t&&""!==t||(t="utf8");if(!a.isEncoding(t))throw new TypeError('"encoding" must be a valid string encoding');var n=0|p(e,t),i=o(n),r=i.write(e,t);r!==n&&(i=i.slice(0,r));return i}(e,t):function(e){if(a.isBuffer(e)){var t=0|f(e.length),n=o(t);return 0===n.length?n:(e.copy(n,0,0,t),n)}if(e){if(j(e)||"length"in e)return"number"!=typeof e.length||U(e.length)?o(0):l(e);if("Buffer"===e.type&&Array.isArray(e.data))return l(e.data)}throw new TypeError("First argument must be a string, Buffer, ArrayBuffer, Array, or array-like object.")}(e)}function u(e){if("number"!=typeof e)throw new TypeError('"size" argument must be a number');if(e<0)throw new RangeError('"size" argument must not be negative')}function h(e){return u(e),o(e<0?0:0|f(e))}function l(e){for(var t=e.length<0?0:0|f(e.length),n=o(t),i=0;i<t;i+=1)n[i]=255&e[i];return n}function f(e){if(e>=s)throw new RangeError("Attempt to allocate Buffer larger than maximum size: 0x"+s.toString(16)+" bytes");return 0|e}function p(e,t){if(a.isBuffer(e))return e.length;if(j(e)||R(e))return e.byteLength;"string"!=typeof e&&(e=""+e);var n=e.length;if(0===n)return 0;for(var i=!1;;)switch(t){case"ascii":case"latin1":case"binary":return n;case"utf8":case"utf-8":case void 0:return M(e).length;case"ucs2":case"ucs-2":case"utf16le":case"utf-16le":return 2*n;case"hex":return n>>>1;case"base64":return P(e).length;default:if(i)return M(e).length;t=(""+t).toLowerCase(),i=!0}}function d(e,t,n){var i=e[t];e[t]=e[n],e[n]=i}function g(e,t,n,i,r){if(0===e.length)return-1;if("string"==typeof n?(i=n,n=0):n>2147483647?n=2147483647:n<-2147483648&&(n=-2147483648),U(n=+n)&&(n=r?0:e.length-1),n<0&&(n=e.length+n),n>=e.length){if(r)return-1;n=e.length-1}else if(n<0){if(!r)return-1;n=0}if("string"==typeof t&&(t=a.from(t,i)),a.isBuffer(t))return 0===t.length?-1:y(e,t,n,i,r);if("number"==typeof t)return t&=255,"function"==typeof Uint8Array.prototype.indexOf?r?Uint8Array.prototype.indexOf.call(e,t,n):Uint8Array.prototype.lastIndexOf.call(e,t,n):y(e,[t],n,i,r);throw new TypeError("val must be string, number or Buffer")}function y(e,t,n,i,r){var s,o=1,a=e.length,c=t.length;if(void 0!==i&&("ucs2"===(i=String(i).toLowerCase())||"ucs-2"===i||"utf16le"===i||"utf-16le"===i)){if(e.length<2||t.length<2)return-1;o=2,a/=2,c/=2,n/=2}function u(e,t){return 1===o?e[t]:e.readUInt16BE(t*o)}if(r){var h=-1;for(s=n;s<a;s++)if(u(e,s)===u(t,-1===h?0:s-h)){if(-1===h&&(h=s),s-h+1===c)return h*o}else-1!==h&&(s-=s-h),h=-1}else for(n+c>a&&(n=a-c),s=n;s>=0;s--){for(var l=!0,f=0;f<c;f++)if(u(e,s+f)!==u(t,f)){l=!1;break}if(l)return s}return-1}function m(e,t,n,i){n=Number(n)||0;var r=e.length-n;i?(i=Number(i))>r&&(i=r):i=r;var s=t.length;if(s%2!=0)throw new TypeError("Invalid hex string");i>s/2&&(i=s/2);for(var o=0;o<i;++o){var a=parseInt(t.substr(2*o,2),16);if(U(a))return o;e[n+o]=a}return o}function v(e,t,n,i){return N(function(e){for(var t=[],n=0;n<e.length;++n)t.push(255&e.charCodeAt(n));return t}(t),e,n,i)}function b(e,t,n){return 0===t&&n===e.length?i.fromByteArray(e):i.fromByteArray(e.slice(t,n))}function w(e,t,n){n=Math.min(e.length,n);for(var i=[],r=t;r<n;){var s,o,a,c,u=e[r],h=null,l=u>239?4:u>223?3:u>191?2:1;if(r+l<=n)switch(l){case 1:u<128&&(h=u);break;case 2:128==(192&(s=e[r+1]))&&(c=(31&u)<<6|63&s)>127&&(h=c);break;case 3:s=e[r+1],o=e[r+2],128==(192&s)&&128==(192&o)&&(c=(15&u)<<12|(63&s)<<6|63&o)>2047&&(c<55296||c>57343)&&(h=c);break;case 4:s=e[r+1],o=e[r+2],a=e[r+3],128==(192&s)&&128==(192&o)&&128==(192&a)&&(c=(15&u)<<18|(63&s)<<12|(63&o)<<6|63&a)>65535&&c<1114112&&(h=c)}null===h?(h=65533,l=1):h>65535&&(h-=65536,i.push(h>>>10&1023|55296),h=56320|1023&h),i.push(h),r+=l}return function(e){var t=e.length;if(t<=S)return String.fromCharCode.apply(String,e);var n="",i=0;for(;i<t;)n+=String.fromCharCode.apply(String,e.slice(i,i+=S));return n}(i)}n.kMaxLength=s,a.TYPED_ARRAY_SUPPORT=function(){try{var e=new Uint8Array(1);return e.__proto__={__proto__:Uint8Array.prototype,foo:function(){return 42}},42===e.foo()}catch(e){return!1}}(),a.TYPED_ARRAY_SUPPORT||"undefined"==typeof console||"function"!=typeof console.error||console.error("This browser lacks typed array (Uint8Array) support which is required by `buffer` v5.x. Use `buffer` v4.x if you require old browser support."),"undefined"!=typeof Symbol&&Symbol.species&&a[Symbol.species]===a&&Object.defineProperty(a,Symbol.species,{value:null,configurable:!0,enumerable:!1,writable:!1}),a.poolSize=8192,a.from=function(e,t,n){return c(e,t,n)},a.prototype.__proto__=Uint8Array.prototype,a.__proto__=Uint8Array,a.alloc=function(e,t,n){return r=t,s=n,u(i=e),i<=0?o(i):void 0!==r?"string"==typeof s?o(i).fill(r,s):o(i).fill(r):o(i);var i,r,s},a.allocUnsafe=function(e){return h(e)},a.allocUnsafeSlow=function(e){return h(e)},a.isBuffer=function(e){return null!=e&&!0===e._isBuffer},a.compare=function(e,t){if(!a.isBuffer(e)||!a.isBuffer(t))throw new TypeError("Arguments must be Buffers");if(e===t)return 0;for(var n=e.length,i=t.length,r=0,s=Math.min(n,i);r<s;++r)if(e[r]!==t[r]){n=e[r],i=t[r];break}return n<i?-1:i<n?1:0},a.isEncoding=function(e){switch(String(e).toLowerCase()){case"hex":case"utf8":case"utf-8":case"ascii":case"latin1":case"binary":case"base64":case"ucs2":case"ucs-2":case"utf16le":case"utf-16le":return!0;default:return!1}},a.concat=function(e,t){if(!Array.isArray(e))throw new TypeError('"list" argument must be an Array of Buffers');if(0===e.length)return a.alloc(0);var n;if(void 0===t)for(t=0,n=0;n<e.length;++n)t+=e[n].length;var i=a.allocUnsafe(t),r=0;for(n=0;n<e.length;++n){var s=e[n];if(!a.isBuffer(s))throw new TypeError('"list" argument must be an Array of Buffers');s.copy(i,r),r+=s.length}return i},a.byteLength=p,a.prototype._isBuffer=!0,a.prototype.swap16=function(){var e=this.length;if(e%2!=0)throw new RangeError("Buffer size must be a multiple of 16-bits");for(var t=0;t<e;t+=2)d(this,t,t+1);return this},a.prototype.swap32=function(){var e=this.length;if(e%4!=0)throw new RangeError("Buffer size must be a multiple of 32-bits");for(var t=0;t<e;t+=4)d(this,t,t+3),d(this,t+1,t+2);return this},a.prototype.swap64=function(){var e=this.length;if(e%8!=0)throw new RangeError("Buffer size must be a multiple of 64-bits");for(var t=0;t<e;t+=8)d(this,t,t+7),d(this,t+1,t+6),d(this,t+2,t+5),d(this,t+3,t+4);return this},a.prototype.toString=function(){var e=this.length;return 0===e?"":0===arguments.length?w(this,0,e):function(e,t,n){var i=!1;if((void 0===t||t<0)&&(t=0),t>this.length)return"";if((void 0===n||n>this.length)&&(n=this.length),n<=0)return"";if((n>>>=0)<=(t>>>=0))return"";for(e||(e="utf8");;)switch(e){case"hex":return _(this,t,n);case"utf8":case"utf-8":return w(this,t,n);case"ascii":return C(this,t,n);case"latin1":case"binary":return I(this,t,n);case"base64":return b(this,t,n);case"ucs2":case"ucs-2":case"utf16le":case"utf-16le":return x(this,t,n);default:if(i)throw new TypeError("Unknown encoding: "+e);e=(e+"").toLowerCase(),i=!0}}.apply(this,arguments)},a.prototype.equals=function(e){if(!a.isBuffer(e))throw new TypeError("Argument must be a Buffer");return this===e||0===a.compare(this,e)},a.prototype.inspect=function(){var e="",t=n.INSPECT_MAX_BYTES;return this.length>0&&(e=this.toString("hex",0,t).match(/.{2}/g).join(" "),this.length>t&&(e+=" ... ")),"<Buffer "+e+">"},a.prototype.compare=function(e,t,n,i,r){if(!a.isBuffer(e))throw new TypeError("Argument must be a Buffer");if(void 0===t&&(t=0),void 0===n&&(n=e?e.length:0),void 0===i&&(i=0),void 0===r&&(r=this.length),t<0||n>e.length||i<0||r>this.length)throw new RangeError("out of range index");if(i>=r&&t>=n)return 0;if(i>=r)return-1;if(t>=n)return 1;if(t>>>=0,n>>>=0,i>>>=0,r>>>=0,this===e)return 0;for(var s=r-i,o=n-t,c=Math.min(s,o),u=this.slice(i,r),h=e.slice(t,n),l=0;l<c;++l)if(u[l]!==h[l]){s=u[l],o=h[l];break}return s<o?-1:o<s?1:0},a.prototype.includes=function(e,t,n){return-1!==this.indexOf(e,t,n)},a.prototype.indexOf=function(e,t,n){return g(this,e,t,n,!0)},a.prototype.lastIndexOf=function(e,t,n){return g(this,e,t,n,!1)},a.prototype.write=function(e,t,n,i){if(void 0===t)i="utf8",n=this.length,t=0;else if(void 0===n&&"string"==typeof t)i=t,n=this.length,t=0;else{if(!isFinite(t))throw new Error("Buffer.write(string, encoding, offset[, length]) is no longer supported");t>>>=0,isFinite(n)?(n>>>=0,void 0===i&&(i="utf8")):(i=n,n=void 0)}var r=this.length-t;if((void 0===n||n>r)&&(n=r),e.length>0&&(n<0||t<0)||t>this.length)throw new RangeError("Attempt to write outside buffer bounds");i||(i="utf8");for(var s,o,a,c,u,h,l,f,p,d=!1;;)switch(i){case"hex":return m(this,e,t,n);case"utf8":case"utf-8":return f=t,p=n,N(M(e,(l=this).length-f),l,f,p);case"ascii":return v(this,e,t,n);case"latin1":case"binary":return v(this,e,t,n);case"base64":return c=this,u=t,h=n,N(P(e),c,u,h);case"ucs2":case"ucs-2":case"utf16le":case"utf-16le":return o=t,a=n,N(function(e,t){for(var n,i,r,s=[],o=0;o<e.length&&!((t-=2)<0);++o)n=e.charCodeAt(o),i=n>>8,r=n%256,s.push(r),s.push(i);return s}(e,(s=this).length-o),s,o,a);default:if(d)throw new TypeError("Unknown encoding: "+i);i=(""+i).toLowerCase(),d=!0}},a.prototype.toJSON=function(){return{type:"Buffer",data:Array.prototype.slice.call(this._arr||this,0)}};var S=4096;function C(e,t,n){var i="";n=Math.min(e.length,n);for(var r=t;r<n;++r)i+=String.fromCharCode(127&e[r]);return i}function I(e,t,n){var i="";n=Math.min(e.length,n);for(var r=t;r<n;++r)i+=String.fromCharCode(e[r]);return i}function _(e,t,n){var i=e.length;(!t||t<0)&&(t=0),(!n||n<0||n>i)&&(n=i);for(var r="",s=t;s<n;++s)r+=A(e[s]);return r}function x(e,t,n){for(var i=e.slice(t,n),r="",s=0;s<i.length;s+=2)r+=String.fromCharCode(i[s]+256*i[s+1]);return r}function E(e,t,n){if(e%1!=0||e<0)throw new RangeError("offset is not uint");if(e+t>n)throw new RangeError("Trying to access beyond buffer length")}function k(e,t,n,i,r,s){if(!a.isBuffer(e))throw new TypeError('"buffer" argument must be a Buffer instance');if(t>r||t<s)throw new RangeError('"value" argument is out of bounds');if(n+i>e.length)throw new RangeError("Index out of range")}function D(e,t,n,i,r,s){if(n+i>e.length)throw new RangeError("Index out of range");if(n<0)throw new RangeError("Index out of range")}function O(e,t,n,i,s){return t=+t,n>>>=0,s||D(e,0,n,4),r.write(e,t,n,i,23,4),n+4}function B(e,t,n,i,s){return t=+t,n>>>=0,s||D(e,0,n,8),r.write(e,t,n,i,52,8),n+8}a.prototype.slice=function(e,t){var n=this.length;e=~~e,t=void 0===t?n:~~t,e<0?(e+=n)<0&&(e=0):e>n&&(e=n),t<0?(t+=n)<0&&(t=0):t>n&&(t=n),t<e&&(t=e);var i=this.subarray(e,t);return i.__proto__=a.prototype,i},a.prototype.readUIntLE=function(e,t,n){e>>>=0,t>>>=0,n||E(e,t,this.length);for(var i=this[e],r=1,s=0;++s<t&&(r*=256);)i+=this[e+s]*r;return i},a.prototype.readUIntBE=function(e,t,n){e>>>=0,t>>>=0,n||E(e,t,this.length);for(var i=this[e+--t],r=1;t>0&&(r*=256);)i+=this[e+--t]*r;return i},a.prototype.readUInt8=function(e,t){return e>>>=0,t||E(e,1,this.length),this[e]},a.prototype.readUInt16LE=function(e,t){return e>>>=0,t||E(e,2,this.length),this[e]|this[e+1]<<8},a.prototype.readUInt16BE=function(e,t){return e>>>=0,t||E(e,2,this.length),this[e]<<8|this[e+1]},a.prototype.readUInt32LE=function(e,t){return e>>>=0,t||E(e,4,this.length),(this[e]|this[e+1]<<8|this[e+2]<<16)+16777216*this[e+3]},a.prototype.readUInt32BE=function(e,t){return e>>>=0,t||E(e,4,this.length),16777216*this[e]+(this[e+1]<<16|this[e+2]<<8|this[e+3])},a.prototype.readIntLE=function(e,t,n){e>>>=0,t>>>=0,n||E(e,t,this.length);for(var i=this[e],r=1,s=0;++s<t&&(r*=256);)i+=this[e+s]*r;return i>=(r*=128)&&(i-=Math.pow(2,8*t)),i},a.prototype.readIntBE=function(e,t,n){e>>>=0,t>>>=0,n||E(e,t,this.length);for(var i=t,r=1,s=this[e+--i];i>0&&(r*=256);)s+=this[e+--i]*r;return s>=(r*=128)&&(s-=Math.pow(2,8*t)),s},a.prototype.readInt8=function(e,t){return e>>>=0,t||E(e,1,this.length),128&this[e]?-1*(255-this[e]+1):this[e]},a.prototype.readInt16LE=function(e,t){e>>>=0,t||E(e,2,this.length);var n=this[e]|this[e+1]<<8;return 32768&n?4294901760|n:n},a.prototype.readInt16BE=function(e,t){e>>>=0,t||E(e,2,this.length);var n=this[e+1]|this[e]<<8;return 32768&n?4294901760|n:n},a.prototype.readInt32LE=function(e,t){return e>>>=0,t||E(e,4,this.length),this[e]|this[e+1]<<8|this[e+2]<<16|this[e+3]<<24},a.prototype.readInt32BE=function(e,t){return e>>>=0,t||E(e,4,this.length),this[e]<<24|this[e+1]<<16|this[e+2]<<8|this[e+3]},a.prototype.readFloatLE=function(e,t){return e>>>=0,t||E(e,4,this.length),r.read(this,e,!0,23,4)},a.prototype.readFloatBE=function(e,t){return e>>>=0,t||E(e,4,this.length),r.read(this,e,!1,23,4)},a.prototype.readDoubleLE=function(e,t){return e>>>=0,t||E(e,8,this.length),r.read(this,e,!0,52,8)},a.prototype.readDoubleBE=function(e,t){return e>>>=0,t||E(e,8,this.length),r.read(this,e,!1,52,8)},a.prototype.writeUIntLE=function(e,t,n,i){(e=+e,t>>>=0,n>>>=0,i)||k(this,e,t,n,Math.pow(2,8*n)-1,0);var r=1,s=0;for(this[t]=255&e;++s<n&&(r*=256);)this[t+s]=e/r&255;return t+n},a.prototype.writeUIntBE=function(e,t,n,i){(e=+e,t>>>=0,n>>>=0,i)||k(this,e,t,n,Math.pow(2,8*n)-1,0);var r=n-1,s=1;for(this[t+r]=255&e;--r>=0&&(s*=256);)this[t+r]=e/s&255;return t+n},a.prototype.writeUInt8=function(e,t,n){return e=+e,t>>>=0,n||k(this,e,t,1,255,0),this[t]=255&e,t+1},a.prototype.writeUInt16LE=function(e,t,n){return e=+e,t>>>=0,n||k(this,e,t,2,65535,0),this[t]=255&e,this[t+1]=e>>>8,t+2},a.prototype.writeUInt16BE=function(e,t,n){return e=+e,t>>>=0,n||k(this,e,t,2,65535,0),this[t]=e>>>8,this[t+1]=255&e,t+2},a.prototype.writeUInt32LE=function(e,t,n){return e=+e,t>>>=0,n||k(this,e,t,4,4294967295,0),this[t+3]=e>>>24,this[t+2]=e>>>16,this[t+1]=e>>>8,this[t]=255&e,t+4},a.prototype.writeUInt32BE=function(e,t,n){return e=+e,t>>>=0,n||k(this,e,t,4,4294967295,0),this[t]=e>>>24,this[t+1]=e>>>16,this[t+2]=e>>>8,this[t+3]=255&e,t+4},a.prototype.writeIntLE=function(e,t,n,i){if(e=+e,t>>>=0,!i){var r=Math.pow(2,8*n-1);k(this,e,t,n,r-1,-r)}var s=0,o=1,a=0;for(this[t]=255&e;++s<n&&(o*=256);)e<0&&0===a&&0!==this[t+s-1]&&(a=1),this[t+s]=(e/o>>0)-a&255;return t+n},a.prototype.writeIntBE=function(e,t,n,i){if(e=+e,t>>>=0,!i){var r=Math.pow(2,8*n-1);k(this,e,t,n,r-1,-r)}var s=n-1,o=1,a=0;for(this[t+s]=255&e;--s>=0&&(o*=256);)e<0&&0===a&&0!==this[t+s+1]&&(a=1),this[t+s]=(e/o>>0)-a&255;return t+n},a.prototype.writeInt8=function(e,t,n){return e=+e,t>>>=0,n||k(this,e,t,1,127,-128),e<0&&(e=255+e+1),this[t]=255&e,t+1},a.prototype.writeInt16LE=function(e,t,n){return e=+e,t>>>=0,n||k(this,e,t,2,32767,-32768),this[t]=255&e,this[t+1]=e>>>8,t+2},a.prototype.writeInt16BE=function(e,t,n){return e=+e,t>>>=0,n||k(this,e,t,2,32767,-32768),this[t]=e>>>8,this[t+1]=255&e,t+2},a.prototype.writeInt32LE=function(e,t,n){return e=+e,t>>>=0,n||k(this,e,t,4,2147483647,-2147483648),this[t]=255&e,this[t+1]=e>>>8,this[t+2]=e>>>16,this[t+3]=e>>>24,t+4},a.prototype.writeInt32BE=function(e,t,n){return e=+e,t>>>=0,n||k(this,e,t,4,2147483647,-2147483648),e<0&&(e=4294967295+e+1),this[t]=e>>>24,this[t+1]=e>>>16,this[t+2]=e>>>8,this[t+3]=255&e,t+4},a.prototype.writeFloatLE=function(e,t,n){return O(this,e,t,!0,n)},a.prototype.writeFloatBE=function(e,t,n){return O(this,e,t,!1,n)},a.prototype.writeDoubleLE=function(e,t,n){return B(this,e,t,!0,n)},a.prototype.writeDoubleBE=function(e,t,n){return B(this,e,t,!1,n)},a.prototype.copy=function(e,t,n,i){if(n||(n=0),i||0===i||(i=this.length),t>=e.length&&(t=e.length),t||(t=0),i>0&&i<n&&(i=n),i===n)return 0;if(0===e.length||0===this.length)return 0;if(t<0)throw new RangeError("targetStart out of bounds");if(n<0||n>=this.length)throw new RangeError("sourceStart out of bounds");if(i<0)throw new RangeError("sourceEnd out of bounds");i>this.length&&(i=this.length),e.length-t<i-n&&(i=e.length-t+n);var r,s=i-n;if(this===e&&n<t&&t<i)for(r=s-1;r>=0;--r)e[r+t]=this[r+n];else if(s<1e3)for(r=0;r<s;++r)e[r+t]=this[r+n];else Uint8Array.prototype.set.call(e,this.subarray(n,n+s),t);return s},a.prototype.fill=function(e,t,n,i){if("string"==typeof e){if("string"==typeof t?(i=t,t=0,n=this.length):"string"==typeof n&&(i=n,n=this.length),1===e.length){var r=e.charCodeAt(0);r<256&&(e=r)}if(void 0!==i&&"string"!=typeof i)throw new TypeError("encoding must be a string");if("string"==typeof i&&!a.isEncoding(i))throw new TypeError("Unknown encoding: "+i)}else"number"==typeof e&&(e&=255);if(t<0||this.length<t||this.length<n)throw new RangeError("Out of range index");if(n<=t)return this;var s;if(t>>>=0,n=void 0===n?this.length:n>>>0,e||(e=0),"number"==typeof e)for(s=t;s<n;++s)this[s]=e;else{var o=a.isBuffer(e)?e:new a(e,i),c=o.length;for(s=0;s<n-t;++s)this[s+t]=o[s%c]}return this};var T=/[^+/0-9A-Za-z-_]/g;function A(e){return e<16?"0"+e.toString(16):e.toString(16)}function M(e,t){var n;t=t||1/0;for(var i=e.length,r=null,s=[],o=0;o<i;++o){if((n=e.charCodeAt(o))>55295&&n<57344){if(!r){if(n>56319){(t-=3)>-1&&s.push(239,191,189);continue}if(o+1===i){(t-=3)>-1&&s.push(239,191,189);continue}r=n;continue}if(n<56320){(t-=3)>-1&&s.push(239,191,189),r=n;continue}n=65536+(r-55296<<10|n-56320)}else r&&(t-=3)>-1&&s.push(239,191,189);if(r=null,n<128){if((t-=1)<0)break;s.push(n)}else if(n<2048){if((t-=2)<0)break;s.push(n>>6|192,63&n|128)}else if(n<65536){if((t-=3)<0)break;s.push(n>>12|224,n>>6&63|128,63&n|128)}else{if(!(n<1114112))throw new Error("Invalid code point");if((t-=4)<0)break;s.push(n>>18|240,n>>12&63|128,n>>6&63|128,63&n|128)}}return s}function P(e){return i.toByteArray(function(e){if((e=e.trim().replace(T,"")).length<2)return"";for(;e.length%4!=0;)e+="=";return e}(e))}function N(e,t,n,i){for(var r=0;r<i&&!(r+n>=t.length||r>=e.length);++r)t[r+n]=e[r];return r}function R(e){return e instanceof ArrayBuffer||null!=e&&null!=e.constructor&&"ArrayBuffer"===e.constructor.name&&"number"==typeof e.byteLength}function j(e){return"function"==typeof ArrayBuffer.isView&&ArrayBuffer.isView(e)}function U(e){return e!=e}},{"base64-js":2,ieee754:11}],5:[function(e,t,n){var i,r;i=this,r=function(){var e,t,n,i,r,s,o,a,c,u,h,l,f=f||(e=Math,t=Object.create||function(){function e(){}return function(t){var n;return e.prototype=t,n=new e,e.prototype=null,n}}(),i=(n={}).lib={},r=i.Base={extend:function(e){var n=t(this);return e&&n.mixIn(e),n.hasOwnProperty("init")&&this.init!==n.init||(n.init=function(){n.$super.init.apply(this,arguments)}),n.init.prototype=n,n.$super=this,n},create:function(){var e=this.extend();return e.init.apply(e,arguments),e},init:function(){},mixIn:function(e){for(var t in e)e.hasOwnProperty(t)&&(this[t]=e[t]);e.hasOwnProperty("toString")&&(this.toString=e.toString)},clone:function(){return this.init.prototype.extend(this)}},s=i.WordArray=r.extend({init:function(e,t){e=this.words=e||[],this.sigBytes=void 0!=t?t:4*e.length},toString:function(e){return(e||a).stringify(this)},concat:function(e){var t=this.words,n=e.words,i=this.sigBytes,r=e.sigBytes;if(this.clamp(),i%4)for(var s=0;s<r;s++){var o=n[s>>>2]>>>24-s%4*8&255;t[i+s>>>2]|=o<<24-(i+s)%4*8}else for(s=0;s<r;s+=4)t[i+s>>>2]=n[s>>>2];return this.sigBytes+=r,this},clamp:function(){var t=this.words,n=this.sigBytes;t[n>>>2]&=4294967295<<32-n%4*8,t.length=e.ceil(n/4)},clone:function(){var e=r.clone.call(this);return e.words=this.words.slice(0),e},random:function(t){for(var n,i=[],r=function(t){t=t;var n=987654321;return function(){var i=((n=36969*(65535&n)+(n>>16)&4294967295)<<16)+(t=18e3*(65535&t)+(t>>16)&4294967295)&4294967295;return i/=4294967296,(i+=.5)*(e.random()>.5?1:-1)}},o=0;o<t;o+=4){var a=r(4294967296*(n||e.random()));n=987654071*a(),i.push(4294967296*a()|0)}return new s.init(i,t)}}),o=n.enc={},a=o.Hex={stringify:function(e){for(var t=e.words,n=e.sigBytes,i=[],r=0;r<n;r++){var s=t[r>>>2]>>>24-r%4*8&255;i.push((s>>>4).toString(16)),i.push((15&s).toString(16))}return i.join("")},parse:function(e){for(var t=e.length,n=[],i=0;i<t;i+=2)n[i>>>3]|=parseInt(e.substr(i,2),16)<<24-i%8*4;return new s.init(n,t/2)}},c=o.Latin1={stringify:function(e){for(var t=e.words,n=e.sigBytes,i=[],r=0;r<n;r++){var s=t[r>>>2]>>>24-r%4*8&255;i.push(String.fromCharCode(s))}return i.join("")},parse:function(e){for(var t=e.length,n=[],i=0;i<t;i++)n[i>>>2]|=(255&e.charCodeAt(i))<<24-i%4*8;return new s.init(n,t)}},u=o.Utf8={stringify:function(e){try{return decodeURIComponent(escape(c.stringify(e)))}catch(e){throw new Error("Malformed UTF-8 data")}},parse:function(e){return c.parse(unescape(encodeURIComponent(e)))}},h=i.BufferedBlockAlgorithm=r.extend({reset:function(){this._data=new s.init,this._nDataBytes=0},_append:function(e){"string"==typeof e&&(e=u.parse(e)),this._data.concat(e),this._nDataBytes+=e.sigBytes},_process:function(t){var n=this._data,i=n.words,r=n.sigBytes,o=this.blockSize,a=r/(4*o),c=(a=t?e.ceil(a):e.max((0|a)-this._minBufferSize,0))*o,u=e.min(4*c,r);if(c){for(var h=0;h<c;h+=o)this._doProcessBlock(i,h);var l=i.splice(0,c);n.sigBytes-=u}return new s.init(l,u)},clone:function(){var e=r.clone.call(this);return e._data=this._data.clone(),e},_minBufferSize:0}),i.Hasher=h.extend({cfg:r.extend(),init:function(e){this.cfg=this.cfg.extend(e),this.reset()},reset:function(){h.reset.call(this),this._doReset()},update:function(e){return this._append(e),this._process(),this},finalize:function(e){return e&&this._append(e),this._doFinalize()},blockSize:16,_createHelper:function(e){return function(t,n){return new e.init(n).finalize(t)}},_createHmacHelper:function(e){return function(t,n){return new l.HMAC.init(e,n).finalize(t)}}}),l=n.algo={},n);return f},"object"==typeof n?t.exports=n=r():i.CryptoJS=r()},{}],6:[function(e,t,n){var i,r;i=this,r=function(e){return function(){var t=e,n=t.lib.WordArray;t.enc.Base64={stringify:function(e){var t=e.words,n=e.sigBytes,i=this._map;e.clamp();for(var r=[],s=0;s<n;s+=3)for(var o=(t[s>>>2]>>>24-s%4*8&255)<<16|(t[s+1>>>2]>>>24-(s+1)%4*8&255)<<8|t[s+2>>>2]>>>24-(s+2)%4*8&255,a=0;a<4&&s+.75*a<n;a++)r.push(i.charAt(o>>>6*(3-a)&63));var c=i.charAt(64);if(c)for(;r.length%4;)r.push(c);return r.join("")},parse:function(e){var t=e.length,i=this._map,r=this._reverseMap;if(!r){r=this._reverseMap=[];for(var s=0;s<i.length;s++)r[i.charCodeAt(s)]=s}var o=i.charAt(64);if(o){var a=e.indexOf(o);-1!==a&&(t=a)}return function(e,t,i){for(var r=[],s=0,o=0;o<t;o++)if(o%4){var a=i[e.charCodeAt(o-1)]<<o%4*2,c=i[e.charCodeAt(o)]>>>6-o%4*2;r[s>>>2]|=(a|c)<<24-s%4*8,s++}return n.create(r,s)}(e,t,r)},_map:"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="}}(),e.enc.Base64},"object"==typeof n?t.exports=n=r(e("./core")):r(i.CryptoJS)},{"./core":5}],7:[function(e,t,n){var i,r;i=this,r=function(e){return e.enc.Utf8},"object"==typeof n?t.exports=n=r(e("./core")):r(i.CryptoJS)},{"./core":5}],8:[function(e,t,n){var i,r;i=this,r=function(e){return e.HmacSHA256},"object"==typeof n?t.exports=n=r(e("./core"),e("./sha256"),e("./hmac")):r(i.CryptoJS)},{"./core":5,"./hmac":9,"./sha256":10}],9:[function(e,t,n){var i,r;i=this,r=function(e){var t,n,i;n=(t=e).lib.Base,i=t.enc.Utf8,t.algo.HMAC=n.extend({init:function(e,t){e=this._hasher=new e.init,"string"==typeof t&&(t=i.parse(t));var n=e.blockSize,r=4*n;t.sigBytes>r&&(t=e.finalize(t)),t.clamp();for(var s=this._oKey=t.clone(),o=this._iKey=t.clone(),a=s.words,c=o.words,u=0;u<n;u++)a[u]^=1549556828,c[u]^=909522486;s.sigBytes=o.sigBytes=r,this.reset()},reset:function(){var e=this._hasher;e.reset(),e.update(this._iKey)},update:function(e){return this._hasher.update(e),this},finalize:function(e){var t=this._hasher,n=t.finalize(e);return t.reset(),t.finalize(this._oKey.clone().concat(n))}})},"object"==typeof n?t.exports=n=r(e("./core")):r(i.CryptoJS)},{"./core":5}],10:[function(e,t,n){var i,r;i=this,r=function(e){return function(t){var n=e,i=n.lib,r=i.WordArray,s=i.Hasher,o=n.algo,a=[],c=[];!function(){function e(e){for(var n=t.sqrt(e),i=2;i<=n;i++)if(!(e%i))return!1;return!0}function n(e){return 4294967296*(e-(0|e))|0}for(var i=2,r=0;r<64;)e(i)&&(r<8&&(a[r]=n(t.pow(i,.5))),c[r]=n(t.pow(i,1/3)),r++),i++}();var u=[],h=o.SHA256=s.extend({_doReset:function(){this._hash=new r.init(a.slice(0))},_doProcessBlock:function(e,t){for(var n=this._hash.words,i=n[0],r=n[1],s=n[2],o=n[3],a=n[4],h=n[5],l=n[6],f=n[7],p=0;p<64;p++){if(p<16)u[p]=0|e[t+p];else{var d=u[p-15],g=(d<<25|d>>>7)^(d<<14|d>>>18)^d>>>3,y=u[p-2],m=(y<<15|y>>>17)^(y<<13|y>>>19)^y>>>10;u[p]=g+u[p-7]+m+u[p-16]}var v=i&r^i&s^r&s,b=(i<<30|i>>>2)^(i<<19|i>>>13)^(i<<10|i>>>22),w=f+((a<<26|a>>>6)^(a<<21|a>>>11)^(a<<7|a>>>25))+(a&h^~a&l)+c[p]+u[p];f=l,l=h,h=a,a=o+w|0,o=s,s=r,r=i,i=w+(b+v)|0}n[0]=n[0]+i|0,n[1]=n[1]+r|0,n[2]=n[2]+s|0,n[3]=n[3]+o|0,n[4]=n[4]+a|0,n[5]=n[5]+h|0,n[6]=n[6]+l|0,n[7]=n[7]+f|0},_doFinalize:function(){var e=this._data,n=e.words,i=8*this._nDataBytes,r=8*e.sigBytes;return n[r>>>5]|=128<<24-r%32,n[14+(r+64>>>9<<4)]=t.floor(i/4294967296),n[15+(r+64>>>9<<4)]=i,e.sigBytes=4*n.length,this._process(),this._hash},clone:function(){var e=s.clone.call(this);return e._hash=this._hash.clone(),e}});n.SHA256=s._createHelper(h),n.HmacSHA256=s._createHmacHelper(h)}(Math),e.SHA256},"object"==typeof n?t.exports=n=r(e("./core")):r(i.CryptoJS)},{"./core":5}],11:[function(e,t,n){n.read=function(e,t,n,i,r){var s,o,a=8*r-i-1,c=(1<<a)-1,u=c>>1,h=-7,l=n?r-1:0,f=n?-1:1,p=e[t+l];for(l+=f,s=p&(1<<-h)-1,p>>=-h,h+=a;h>0;s=256*s+e[t+l],l+=f,h-=8);for(o=s&(1<<-h)-1,s>>=-h,h+=i;h>0;o=256*o+e[t+l],l+=f,h-=8);if(0===s)s=1-u;else{if(s===c)return o?NaN:1/0*(p?-1:1);o+=Math.pow(2,i),s-=u}return(p?-1:1)*o*Math.pow(2,s-i)},n.write=function(e,t,n,i,r,s){var o,a,c,u=8*s-r-1,h=(1<<u)-1,l=h>>1,f=23===r?Math.pow(2,-24)-Math.pow(2,-77):0,p=i?0:s-1,d=i?1:-1,g=t<0||0===t&&1/t<0?1:0;for(t=Math.abs(t),isNaN(t)||t===1/0?(a=isNaN(t)?1:0,o=h):(o=Math.floor(Math.log(t)/Math.LN2),t*(c=Math.pow(2,-o))<1&&(o--,c*=2),(t+=o+l>=1?f/c:f*Math.pow(2,1-l))*c>=2&&(o++,c/=2),o+l>=h?(a=0,o=h):o+l>=1?(a=(t*c-1)*Math.pow(2,r),o+=l):(a=t*Math.pow(2,l-1)*Math.pow(2,r),o=0));r>=8;e[n+p]=255&a,p+=d,a/=256,r-=8);for(o=o<<r|a,u+=r;u>0;e[n+p]=255&o,p+=d,o/=256,u-=8);e[n+p-d]|=128*g}},{}],12:[function(e,t,n){var i,r,s=t.exports={};function o(){throw new Error("setTimeout has not been defined")}function a(){throw new Error("clearTimeout has not been defined")}function c(e){if(i===setTimeout)return setTimeout(e,0);if((i===o||!i)&&setTimeout)return i=setTimeout,setTimeout(e,0);try{return i(e,0)}catch(t){try{return i.call(null,e,0)}catch(t){return i.call(this,e,0)}}}!function(){try{i="function"==typeof setTimeout?setTimeout:o}catch(e){i=o}try{r="function"==typeof clearTimeout?clearTimeout:a}catch(e){r=a}}();var u,h=[],l=!1,f=-1;function p(){l&&u&&(l=!1,u.length?h=u.concat(h):f=-1,h.length&&d())}function d(){if(!l){var e=c(p);l=!0;for(var t=h.length;t;){for(u=h,h=[];++f<t;)u&&u[f].run();f=-1,t=h.length}u=null,l=!1,function(e){if(r===clearTimeout)return clearTimeout(e);if((r===a||!r)&&clearTimeout)return r=clearTimeout,clearTimeout(e);try{r(e)}catch(t){try{return r.call(null,e)}catch(t){return r.call(this,e)}}}(e)}}function g(e,t){this.fun=e,this.array=t}function y(){}s.nextTick=function(e){var t=new Array(arguments.length-1);if(arguments.length>1)for(var n=1;n<arguments.length;n++)t[n-1]=arguments[n];h.push(new g(e,t)),1!==h.length||l||c(d)},g.prototype.run=function(){this.fun.apply(null,this.array)},s.title="browser",s.browser=!0,s.env={},s.argv=[],s.version="",s.versions={},s.on=y,s.addListener=y,s.once=y,s.off=y,s.removeListener=y,s.removeAllListeners=y,s.emit=y,s.prependListener=y,s.prependOnceListener=y,s.listeners=function(e){return[]},s.binding=function(e){throw new Error("process.binding is not supported")},s.cwd=function(){return"/"},s.chdir=function(e){throw new Error("process.chdir is not supported")},s.umask=function(){return 0}},{}],13:[function(e,t,n){(function(e){!function(e){"use strict";if("function"==typeof bootstrap)bootstrap("promise",e);else if("object"==typeof n&&"object"==typeof t)t.exports=e();else if("undefined"!=typeof ses){if(!ses.ok())return;ses.makeQ=e}else{if("undefined"==typeof window&&"undefined"==typeof self)throw new Error("This environment was not anticipated by Q. Please file a bug.");var i="undefined"!=typeof window?window:self,r=i.Q;i.Q=e(),i.Q.noConflict=function(){return i.Q=r,this}}}(function(){"use strict";var t=!1;try{throw new Error}catch(e){t=!!e.stack}var n,i=C(),r=function(){},s=function(){var t={task:void 0,next:null},n=t,i=!1,r=void 0,o=!1,a=[];function c(){for(var e,n;t.next;)e=(t=t.next).task,t.task=void 0,(n=t.domain)&&(t.domain=void 0,n.enter()),u(e,n);for(;a.length;)u(e=a.pop());i=!1}function u(e,t){try{e()}catch(e){if(o)throw t&&t.exit(),setTimeout(c,0),t&&t.enter(),e;setTimeout(function(){throw e},0)}t&&t.exit()}if(s=function(t){n=n.next={task:t,domain:o&&e.domain,next:null},i||(i=!0,r())},"object"==typeof e&&"[object process]"===e.toString()&&e.nextTick)o=!0,r=function(){e.nextTick(c)};else if("function"==typeof setImmediate)r="undefined"!=typeof window?setImmediate.bind(window,c):function(){setImmediate(c)};else if("undefined"!=typeof MessageChannel){var h=new MessageChannel;h.port1.onmessage=function(){r=l,h.port1.onmessage=c,c()};var l=function(){h.port2.postMessage(0)};r=function(){setTimeout(c,0),l()}}else r=function(){setTimeout(c,0)};return s.runAfter=function(e){a.push(e),i||(i=!0,r())},s}(),o=Function.call;function a(e){return function(){return o.apply(e,arguments)}}var c,u=a(Array.prototype.slice),h=a(Array.prototype.reduce||function(e,t){var n=0,i=this.length;if(1===arguments.length)for(;;){if(n in this){t=this[n++];break}if(++n>=i)throw new TypeError}for(;n<i;n++)n in this&&(t=e(t,this[n],n));return t}),l=a(Array.prototype.indexOf||function(e){for(var t=0;t<this.length;t++)if(this[t]===e)return t;return-1}),f=a(Array.prototype.map||function(e,t){var n=this,i=[];return h(n,function(r,s,o){i.push(e.call(t,s,o,n))},void 0),i}),p=Object.create||function(e){function t(){}return t.prototype=e,new t},d=Object.defineProperty||function(e,t,n){return e[t]=n.value,e},g=a(Object.prototype.hasOwnProperty),y=Object.keys||function(e){var t=[];for(var n in e)g(e,n)&&t.push(n);return t},m=a(Object.prototype.toString);c="undefined"!=typeof ReturnValue?ReturnValue:function(e){this.value=e};var v="From previous event:";function b(e,n){if(t&&n.stack&&"object"==typeof e&&null!==e&&e.stack){for(var i=[],r=n;r;r=r.source)r.stack&&(!e.__minimumStackCounter__||e.__minimumStackCounter__>r.stackCounter)&&(d(e,"__minimumStackCounter__",{value:r.stackCounter,configurable:!0}),i.unshift(r.stack));i.unshift(e.stack);var s=function(e){for(var t=e.split("\n"),n=[],i=0;i<t.length;++i){var r=t[i];!S(r)&&(-1===(s=r).indexOf("(module.js:")&&-1===s.indexOf("(node.js:"))&&r&&n.push(r)}var s;return n.join("\n")}(i.join("\n"+v+"\n"));d(e,"stack",{value:s,configurable:!0})}}function w(e){var t=/at .+ \((.+):(\d+):(?:\d+)\)$/.exec(e);if(t)return[t[1],Number(t[2])];var n=/at ([^ ]+):(\d+):(?:\d+)$/.exec(e);if(n)return[n[1],Number(n[2])];var i=/.*@(.+):(\d+)$/.exec(e);return i?[i[1],Number(i[2])]:void 0}function S(e){var t=w(e);if(!t)return!1;var r=t[0],s=t[1];return r===n&&s>=i&&s<=X}function C(){if(t)try{throw new Error}catch(t){var e=t.stack.split("\n"),i=w(e[0].indexOf("@")>0?e[1]:e[2]);if(!i)return;return n=i[0],i[1]}}function I(e){return e instanceof D?e:A(e)?(t=e,n=x(),I.nextTick(function(){try{t.then(n.resolve,n.reject,n.notify)}catch(e){n.reject(e)}}),n.promise):z(e);var t,n}I.resolve=I,I.nextTick=s,I.longStackSupport=!1;var _=1;function x(){var e,n=[],i=[],r=p(x.prototype),s=p(D.prototype);if(s.promiseDispatch=function(t,r,s){var o=u(arguments);n?(n.push(o),"when"===r&&s[1]&&i.push(s[1])):I.nextTick(function(){e.promiseDispatch.apply(e,o)})},s.valueOf=function(){if(n)return s;var t=B(e);return T(t)&&(e=t),t},s.inspect=function(){return e?e.inspect():{state:"pending"}},I.longStackSupport&&t)try{throw new Error}catch(e){s.stack=e.stack.substring(e.stack.indexOf("\n")+1),s.stackCounter=_++}function o(r){e=r,I.longStackSupport&&t&&(s.source=r),h(n,function(e,t){I.nextTick(function(){r.promiseDispatch.apply(r,t)})},void 0),n=void 0,i=void 0}return r.promise=s,r.resolve=function(t){e||o(I(t))},r.fulfill=function(t){e||o(z(t))},r.reject=function(t){e||o(H(t))},r.notify=function(t){e||h(i,function(e,n){I.nextTick(function(){n(t)})},void 0)},r}function E(e){if("function"!=typeof e)throw new TypeError("resolver must be a function.");var t=x();try{e(t.resolve,t.reject,t.notify)}catch(e){t.reject(e)}return t.promise}function k(e){return E(function(t,n){for(var i=0,r=e.length;i<r;i++)I(e[i]).then(t,n)})}function D(e,t,n){void 0===t&&(t=function(e){return H(new Error("Promise does not support operation: "+e))}),void 0===n&&(n=function(){return{state:"unknown"}});var i=p(D.prototype);if(i.promiseDispatch=function(n,r,s){var o;try{o=e[r]?e[r].apply(i,s):t.call(i,r,s)}catch(e){o=H(e)}n&&n(o)},i.inspect=n,n){var r=n();"rejected"===r.state&&(i.exception=r.reason),i.valueOf=function(){var e=n();return"pending"===e.state||"rejected"===e.state?i:e.value}}return i}function O(e,t,n,i){return I(e).then(t,n,i)}function B(e){if(T(e)){var t=e.inspect();if("fulfilled"===t.state)return t.value}return e}function T(e){return e instanceof D}function A(e){return(t=e)===Object(t)&&"function"==typeof e.then;var t}"object"==typeof e&&e&&e.env&&e.env.Q_DEBUG&&(I.longStackSupport=!0),I.defer=x,x.prototype.makeNodeResolver=function(){var e=this;return function(t,n){t?e.reject(t):arguments.length>2?e.resolve(u(arguments,1)):e.resolve(n)}},I.Promise=E,I.promise=E,E.race=k,E.all=V,E.reject=H,E.resolve=I,I.passByCopy=function(e){return e},D.prototype.passByCopy=function(){return this},I.join=function(e,t){return I(e).join(t)},D.prototype.join=function(e){return I([this,e]).spread(function(e,t){if(e===t)return e;throw new Error("Q can't join: not the same: "+e+" "+t)})},I.race=k,D.prototype.race=function(){return this.then(I.race)},I.makePromise=D,D.prototype.toString=function(){return"[object Promise]"},D.prototype.then=function(e,t,n){var i=this,r=x(),s=!1;return I.nextTick(function(){i.promiseDispatch(function(t){s||(s=!0,r.resolve(function(t){try{return"function"==typeof e?e(t):t}catch(e){return H(e)}}(t)))},"when",[function(e){s||(s=!0,r.resolve(function(e){if("function"==typeof t){b(e,i);try{return t(e)}catch(e){return H(e)}}return H(e)}(e)))}])}),i.promiseDispatch(void 0,"when",[void 0,function(e){var t,i,s=!1;try{i=e,t="function"==typeof n?n(i):i}catch(e){if(s=!0,!I.onerror)throw e;I.onerror(e)}s||r.notify(t)}]),r.promise},I.tap=function(e,t){return I(e).tap(t)},D.prototype.tap=function(e){return e=I(e),this.then(function(t){return e.fcall(t).thenResolve(t)})},I.when=O,D.prototype.thenResolve=function(e){return this.then(function(){return e})},I.thenResolve=function(e,t){return I(e).thenResolve(t)},D.prototype.thenReject=function(e){return this.then(function(){throw e})},I.thenReject=function(e,t){return I(e).thenReject(t)},I.nearer=B,I.isPromise=T,I.isPromiseAlike=A,I.isPending=function(e){return T(e)&&"pending"===e.inspect().state},D.prototype.isPending=function(){return"pending"===this.inspect().state},I.isFulfilled=function(e){return!T(e)||"fulfilled"===e.inspect().state},D.prototype.isFulfilled=function(){return"fulfilled"===this.inspect().state},I.isRejected=function(e){return T(e)&&"rejected"===e.inspect().state},D.prototype.isRejected=function(){return"rejected"===this.inspect().state};var M,P,N,R=[],j=[],U=[],L=!0;function K(){R.length=0,j.length=0,L||(L=!0)}function H(t){var n,i,r=D({when:function(n){return n&&function(t){if(L){var n=l(j,t);-1!==n&&("object"==typeof e&&"function"==typeof e.emit&&I.nextTick.runAfter(function(){var i=l(U,t);-1!==i&&(e.emit("rejectionHandled",R[n],t),U.splice(i,1))}),j.splice(n,1),R.splice(n,1))}}(this),n?n(t):this}},function(){return this},function(){return{state:"rejected",reason:t}});return n=r,i=t,L&&("object"==typeof e&&"function"==typeof e.emit&&I.nextTick.runAfter(function(){-1!==l(j,n)&&(e.emit("unhandledRejection",i,n),U.push(n))}),j.push(n),i&&void 0!==i.stack?R.push(i.stack):R.push("(no stack) "+i)),r}function z(e){return D({when:function(){return e},get:function(t){return e[t]},set:function(t,n){e[t]=n},delete:function(t){delete e[t]},post:function(t,n){return null===t||void 0===t?e.apply(void 0,n):e[t].apply(e,n)},apply:function(t,n){return e.apply(t,n)},keys:function(){return y(e)}},void 0,function(){return{state:"fulfilled",value:e}})}function F(e,t,n){return I(e).spread(t,n)}function G(e,t,n){return I(e).dispatch(t,n)}function V(e){return O(e,function(e){var t=0,n=x();return h(e,function(i,r,s){var o;T(r)&&"fulfilled"===(o=r.inspect()).state?e[s]=o.value:(++t,O(r,function(i){e[s]=i,0==--t&&n.resolve(e)},n.reject,function(e){n.notify({index:s,value:e})}))},void 0),0===t&&n.resolve(e),n.promise})}function J(e){if(0===e.length)return I.resolve();var t=I.defer(),n=0;return h(e,function(i,r,s){var o=e[s];n++,O(o,function(e){t.resolve(e)},function(e){if(0==--n){var i=e||new Error(""+e);i.message="Q can't get fulfillment value from any promise, all promises were rejected. Last error message: "+i.message,t.reject(i)}},function(e){t.notify({index:s,value:e})})},void 0),t.promise}function W(e){return O(e,function(e){return e=f(e,I),O(V(f(e,function(e){return O(e,r,r)})),function(){return e})})}I.resetUnhandledRejections=K,I.getUnhandledReasons=function(){return R.slice()},I.stopUnhandledRejectionTracking=function(){K(),L=!1},K(),I.reject=H,I.fulfill=z,I.master=function(e){return D({isDef:function(){}},function(t,n){return G(e,t,n)},function(){return I(e).inspect()})},I.spread=F,D.prototype.spread=function(e,t){return this.all().then(function(t){return e.apply(void 0,t)},t)},I.async=function(e){return function(){function t(e,t){var s,o;if("undefined"==typeof StopIteration){try{s=n[e](t)}catch(e){return H(e)}return s.done?I(s.value):O(s.value,i,r)}try{s=n[e](t)}catch(e){return"[object StopIteration]"===m(o=e)||o instanceof c?I(e.value):H(e)}return O(s,i,r)}var n=e.apply(this,arguments),i=t.bind(t,"next"),r=t.bind(t,"throw");return i()}},I.spawn=function(e){I.done(I.async(e)())},I.return=function(e){throw new c(e)},I.promised=function(e){return function(){return F([this,V(arguments)],function(t,n){return e.apply(t,n)})}},I.dispatch=G,D.prototype.dispatch=function(e,t){var n=this,i=x();return I.nextTick(function(){n.promiseDispatch(i.resolve,e,t)}),i.promise},I.get=function(e,t){return I(e).dispatch("get",[t])},D.prototype.get=function(e){return this.dispatch("get",[e])},I.set=function(e,t,n){return I(e).dispatch("set",[t,n])},D.prototype.set=function(e,t){return this.dispatch("set",[e,t])},I.del=I.delete=function(e,t){return I(e).dispatch("delete",[t])},D.prototype.del=D.prototype.delete=function(e){return this.dispatch("delete",[e])},I.mapply=I.post=function(e,t,n){return I(e).dispatch("post",[t,n])},D.prototype.mapply=D.prototype.post=function(e,t){return this.dispatch("post",[e,t])},I.send=I.mcall=I.invoke=function(e,t){return I(e).dispatch("post",[t,u(arguments,2)])},D.prototype.send=D.prototype.mcall=D.prototype.invoke=function(e){return this.dispatch("post",[e,u(arguments,1)])},I.fapply=function(e,t){return I(e).dispatch("apply",[void 0,t])},D.prototype.fapply=function(e){return this.dispatch("apply",[void 0,e])},I.try=I.fcall=function(e){return I(e).dispatch("apply",[void 0,u(arguments,1)])},D.prototype.fcall=function(){return this.dispatch("apply",[void 0,u(arguments)])},I.fbind=function(e){var t=I(e),n=u(arguments,1);return function(){return t.dispatch("apply",[this,n.concat(u(arguments))])}},D.prototype.fbind=function(){var e=this,t=u(arguments);return function(){return e.dispatch("apply",[this,t.concat(u(arguments))])}},I.keys=function(e){return I(e).dispatch("keys",[])},D.prototype.keys=function(){return this.dispatch("keys",[])},I.all=V,D.prototype.all=function(){return V(this)},I.any=J,D.prototype.any=function(){return J(this)},I.allResolved=(M=W,P="allResolved",N="allSettled",function(){return"undefined"!=typeof console&&"function"==typeof console.warn&&console.warn(P+" is deprecated, use "+N+" instead.",new Error("").stack),M.apply(M,arguments)}),D.prototype.allResolved=function(){return W(this)},I.allSettled=function(e){return I(e).allSettled()},D.prototype.allSettled=function(){return this.then(function(e){return V(f(e,function(e){function t(){return e.inspect()}return(e=I(e)).then(t,t)}))})},I.fail=I.catch=function(e,t){return I(e).then(void 0,t)},D.prototype.fail=D.prototype.catch=function(e){return this.then(void 0,e)},I.progress=function(e,t){return I(e).then(void 0,void 0,t)},D.prototype.progress=function(e){return this.then(void 0,void 0,e)},I.fin=I.finally=function(e,t){return I(e).finally(t)},D.prototype.fin=D.prototype.finally=function(e){if(!e||"function"!=typeof e.apply)throw new Error("Q can't apply finally callback");return e=I(e),this.then(function(t){return e.fcall().then(function(){return t})},function(t){return e.fcall().then(function(){throw t})})},I.done=function(e,t,n,i){return I(e).done(t,n,i)},D.prototype.done=function(t,n,i){var r=function(e){I.nextTick(function(){if(b(e,s),!I.onerror)throw e;I.onerror(e)})},s=t||n||i?this.then(t,n,i):this;"object"==typeof e&&e&&e.domain&&(r=e.domain.bind(r)),s.then(void 0,r)},I.timeout=function(e,t,n){return I(e).timeout(t,n)},D.prototype.timeout=function(e,t){var n=x(),i=setTimeout(function(){t&&"string"!=typeof t||((t=new Error(t||"Timed out after "+e+" ms")).code="ETIMEDOUT"),n.reject(t)},e);return this.then(function(e){clearTimeout(i),n.resolve(e)},function(e){clearTimeout(i),n.reject(e)},n.notify),n.promise},I.delay=function(e,t){return void 0===t&&(t=e,e=void 0),I(e).delay(t)},D.prototype.delay=function(e){return this.then(function(t){var n=x();return setTimeout(function(){n.resolve(t)},e),n.promise})},I.nfapply=function(e,t){return I(e).nfapply(t)},D.prototype.nfapply=function(e){var t=x(),n=u(e);return n.push(t.makeNodeResolver()),this.fapply(n).fail(t.reject),t.promise},I.nfcall=function(e){var t=u(arguments,1);return I(e).nfapply(t)},D.prototype.nfcall=function(){var e=u(arguments),t=x();return e.push(t.makeNodeResolver()),this.fapply(e).fail(t.reject),t.promise},I.nfbind=I.denodeify=function(e){if(void 0===e)throw new Error("Q can't wrap an undefined function");var t=u(arguments,1);return function(){var n=t.concat(u(arguments)),i=x();return n.push(i.makeNodeResolver()),I(e).fapply(n).fail(i.reject),i.promise}},D.prototype.nfbind=D.prototype.denodeify=function(){var e=u(arguments);return e.unshift(this),I.denodeify.apply(void 0,e)},I.nbind=function(e,t){var n=u(arguments,2);return function(){var i=n.concat(u(arguments)),r=x();return i.push(r.makeNodeResolver()),I(function(){return e.apply(t,arguments)}).fapply(i).fail(r.reject),r.promise}},D.prototype.nbind=function(){var e=u(arguments,0);return e.unshift(this),I.nbind.apply(void 0,e)},I.nmapply=I.npost=function(e,t,n){return I(e).npost(t,n)},D.prototype.nmapply=D.prototype.npost=function(e,t){var n=u(t||[]),i=x();return n.push(i.makeNodeResolver()),this.dispatch("post",[e,n]).fail(i.reject),i.promise},I.nsend=I.nmcall=I.ninvoke=function(e,t){var n=u(arguments,2),i=x();return n.push(i.makeNodeResolver()),I(e).dispatch("post",[t,n]).fail(i.reject),i.promise},D.prototype.nsend=D.prototype.nmcall=D.prototype.ninvoke=function(e){var t=u(arguments,1),n=x();return t.push(n.makeNodeResolver()),this.dispatch("post",[e,t]).fail(n.reject),n.promise},I.nodeify=function(e,t){return I(e).nodeify(t)},D.prototype.nodeify=function(e){if(!e)return this;this.then(function(t){I.nextTick(function(){e(null,t)})},function(t){I.nextTick(function(){e(t)})})},I.noConflict=function(){throw new Error("Q.noConflict only works when Q is used as a global")};var X=C();return I})}).call(this,e("_process"))},{_process:12}],14:[function(e,t,n){var i=e("btoa"),r=(e("atob"),e("crypto-js/hmac-sha256")),s=e("crypto-js/enc-base64");e("crypto-js/enc-utf8");t.exports=function(e,t,n,o){var a={applicationKey:e,identity:{type:"username",endpoint:n.username},created:o||(new Date).toISOString(),expiresIn:86400},c=JSON.stringify(a).replace(" ","");return{userTicket:i(c)+":"+r(c,s.parse(t)).toString(s)}}},{atob:15,btoa:3,"crypto-js/enc-base64":6,"crypto-js/enc-utf8":7,"crypto-js/hmac-sha256":8}],15:[function(e,t,n){(function(e){!function(){"use strict";t.exports=function(t){return new e(t,"base64").toString("binary")}}()}).call(this,e("buffer").Buffer)},{buffer:4}],16:[function(e,t,n){var i,r=e("q"),s=e("../VERSION"),o=e("sinch-ticketgen"),a={ErrorDomainNone:-1,ErrorDomainNetwork:0,ErrorDomainCapability:1,ErrorDomainSession:2,ErrorDomainApi:3,ErrorDomainOther:4,ErrorDomainSDK:5,ErrorDomainVerification:7},c={NoneNone:0,NetworkConnectionRefused:1e3,NetworkConnectionTimedOut:1001,NetworkServerError:1002,CapabilityUserNotFound:2e3,CapabilityCapabilityMissing:2001,CapabilityAuthenticationFailed:2002,SessionFailedToInitiateSession:3e3,SessionNoPendingSessionExists:3001,SessionTransferCantBeInitiated:3002,SessionActiveUserLimitReached:3003,ApiApiCallFailed:4e3,OtherInvalidOfflinePayloadTooBig:5e3,OtherInvalidOfflineInvitePayloadFailedToDecode:5001,OtherInvalidOfflineInviteUnknownType:5002,OtherOther:5003,SDKUnexpectedCall:6e3,SDKInternalError:6001,SDKInternalOther:6002,SDKMissingParameter:6003,SDKMissingCallback:6004,VerificationInvalidInput:7001,VerificationServiceError:7002,VerificationIncorrectCode:7003,VerificationFailedToInterceptCode:7004,VerificationUnexpectedInitiateError:7005},u=function(e,t){var n={method:e.method,headers:{"Content-Type":"application/json; charset=UTF-8",Accept:"application/json, text/plain, */*"}};"GET"!=e.method&&(n.data=t),n.url="";for(var i in e.urlParts){if(":"===e.urlParts[i][0]){var s=e.urlParts[i].slice(1);n.url+=encodeURIComponent((t||{})[s]).replace(/%2B/g,"+").replace(/%40/g,"@")}else n.url+=e.urlParts[i];i<e.urlParts.length-1&&(n.url+="/")}switch(e.auth){case"sign":n.headers=this.signSession(n);break;case"nosign":n.headers=this.signApp(n);break;case"ticket":n.headers=this.signTicket(n),delete n.data.authorization;break;case"signorticket":this._sessionId?n.headers=this.signSession(n):(n.headers=this.signTicket(n),delete n.data.authorization);break;default:throw new Error("Unsupported authentication type: "+e.auth)}if("GET"===e.method&&t&&Object.keys(t).length>0&&!e.hideQueryParams){n.url+="?";for(var o in t)n.url+=encodeURIComponent(o)+"="+encodeURIComponent(t[o])+"&"}return function(e){var t=r.defer(),n=new XMLHttpRequest;n.onload=function(){if(n.status>=200&&n.status<300){try{n.response=n.response||n.responseText,n.data=JSON.parse(n.response||"{}")}catch(e){console.log("Cant parse JSON"+n.response)}t.resolve(n.data)}else{try{n.response=n.response||n.responseText,n.data=JSON.parse(n.response||"{}")}catch(e){console.log("Cant parse JSON"+n.response)}t.reject(n)}},n.onerror=function(){t.reject(new Error("Unsupported operation "+n.status,n))},n.open(e.method,e.url,!0);for(var i in e.headers)n.setRequestHeader(i,e.headers[i]);return n.send(JSON.stringify(e.data)),t.promise}(n)},h=function(){return"xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,function(e){var t=16*Math.random()|0;return("x"==e?t:3&t|8).toString(16)})};function Notification(e,t,n,i){this.progress=e/t,this.message=n,this.object=i}function l(){var e,t=navigator.userAgent,n=t.match(/(opera|chrome|safari|firefox|msie|trident(?=\/))\/?\s*(\d+)/i)||t.match(/(applewebkit(?=\/))\/?\s*(\d+)/i)||[];return/trident/i.test(n[1])?"IE "+((e=/\brv[ :]+(\d+)/g.exec(t)||[])[1]||""):"Chrome"===n[1]&&null!=(e=t.match(/\bOPR\/(\d+)/))?"Opera "+e[1]:(n=n[2]?[n[1],n[2]]:[navigator.appName,navigator.appVersion,"-?"],null!=(e=t.match(/version\/(\d+)/i))&&n.splice(1,1,e[1]),n.join("/").substring(0,50))}function f(){return navigator.platform}function p(e){if(!e)throw new TypeError("Could not create SinchClient, configuration not provided.");if(e.capabilities=e.capabilities||{},"string"!=typeof e.applicationKey)throw new TypeError("Could not create SinchClient, applicationKey is not a string");this.capabilities=e.capabilities,this._appKey=e.applicationKey||"",this._appSecret=e.applicationSecret||void 0,this._sessionId="",this._sessionSecret="",this._logHandler=e.onLogMessage||function(){},this._logMxpHandler=e.onLogMxpMessage||function(){},this._onlineCapability=e.startActiveConnection||e.supportActiveConnection||!1,this._autoStartMxp=e.startActiveConnection||!1,this._expiresIn=e.expiresIn||86400,this._subInstanceId=Math.round(Math.random()*Math.pow(2,32)),this._customStream=e.customStream||void 0,this._supportVideo=e.capabilities.video||!1,this._multiCall=e.capabilities.multiCall||!1,this.applicationKey=this._appKey,this._supportManagedPush=e.supportManagedPush,this._progressTimeout=e.progressTimeout||10500,this.firefox=!1,"undefined"!=typeof navigator&&(this.firefox=(navigator||{userAgent:""}).userAgent.indexOf("Firefox")>0||(navigator||{vendor:""}).vendor.indexOf("Apple Computer")>0),this._url={base:"https://api.sinch.com/v1/",user:"https://userapi.sinch.com/v1/",portal:"https://portalapi.sinch.com/v1/",reporting:"https://reportingapi.sinch.com/v1/",reporting_v2:"https://reportingapi.sinch.com/v2/",calling:"https://callingapi.sinch.com/v1/",messaging:"https://messagingapi.sinch.com/v1/",verification:"https://verificationapi-v1.sinch.com/verification/v1/"},this.setUrl(e.urlObj||{}),this.loadPAPIUrl(),this.loadTimeDelta(),this.user=new R(this),"messaging"in this.capabilities&&this.capabilities.messaging&&(this.messageClient=new T(this)),"calling"in this.capabilities&&this.capabilities.calling&&(this.callClient=new m(this,e.customStream)),"stealth"in this.capabilities&&this.capabilities.stealth&&(this.callClient=new m(this,e.customStream))}(i=i||{}).base={getServerTime:{url:"timestamp/",method:"GET",auth:"nosign"},getInstance:{url:"instance",method:"POST",auth:"ticket"},renewInstance:{url:"instance",method:"POST",auth:"sign"},renewSecret:{url:"instances/id/:instanceId/authorization",method:"PUT",auth:"ticket"},getInstances:{url:"instances/id/",method:"GET",auth:"sign"}},(i=i||{}).calling={getConfiguration:{url:"configuration/user",method:"GET",auth:"sign"},placeCall:{url:"calls/:domain",method:"POST",auth:"sign"},callReporting:{url:"calls/:domain/id/:callId",method:"PUT",auth:"sign"},postMedia:{url:"media",method:"POST",auth:"sign"},pushCall:{url:"push",method:"POST",auth:"sign"}},(i=i||{}).messaging={getTransportById:{url:"transport",method:"GET",auth:"sign"},getTransportByParticipants:{url:"transport",method:"POST",auth:"sign"},messageReporting:{url:"report/im",method:"POST",auth:"sign"},pushMessage:{url:"push/messages",method:"POST",auth:"sign"}},(i=i||{}).user={authenticate:{url:"users/email/:email/authentication",method:"POST",auth:"nosign"},authenticateUsername:{url:"users/username/:username/authentication",method:"POST",auth:"nosign"},authenticateNumber:{url:"users/number/:number/authentication",method:"POST",auth:"nosign"},createUser:{url:"users",method:"POST",auth:"nosign"},changePassword:{url:"user/password",method:"PUT",auth:"sign"},updateUser:{url:"user/profile",method:"PATCH",auth:"sign"},getUserProfile:{url:"user/profile",method:"GET",auth:"sign"}},(i=i||{}).verification={verify:{url:"verifications",method:"POST",auth:"nosign"},confirmVerification:{url:"verifications/number/:number",method:"PUT",auth:"nosign"},confirmUserCallout:{url:"verifications",method:"POST",auth:"nosign"},confirmFlashCall:{url:"verifications/number/:number",method:"PUT",auth:"nosign"},queryVerificationById:{url:"verifications/callout/number/:number",method:"GET",hideQueryParams:!0,auth:"nosign"}},p.prototype.loadPAPIUrl=function(){this.PAPI=JSON.parse(JSON.stringify(i));for(var e in i)for(var t in i[e])this.PAPI[e][t].urlParts=(this._url[e]+this.PAPI[e][t].url).split("/"),this[t]=u.bind(this,this.PAPI[e][t])},p.prototype.loadTimeDelta=function(){var e=r.defer();return this.timeDelta?e.resolve():this.getServerTime().then(function(t){var n=new Date(t.timestamp),i=new Date;this.timeDelta=n-i,e.resolve()}.bind(this)).catch(function(t){console.error(t),e.fail(t)}),e.promise},p.prototype.config=function(e){this._appKey=e.appKey||this._appKey,this._sessionId=e.sessionId||this._sessionId,this._sessionSecret=e.sessionSecret||this._sessionSecret,localStorage["SinchSDK-"+this._appKey+"-"+this.user.userId]=this._sessionId},p.prototype.loadSessionId=function(){this._sessionId=localStorage["SinchSDK-"+this._appKey+"-"+this.user.userId]||""},p.prototype.log=function(e,t){t&&t.notify(e),this._logHandler(e)},p.prototype.logMxp=function(e){this._logMxpHandler(e)},p.prototype.setUrl=function(e){this._url.user=e.user||this._url.user,this._url.base=e.base||this._url.base,this._url.portal=e.portal||this._url.portal,this._url.reporting=e.reporting||this._url.reporting,this._url.reporting_v2=e.reporting_v2||this._url.reporting_v2,this._url.calling=e.calling||this._url.calling,this._url.messaging=e.messaging||this._url.messaging,this._url.verification=e.verification||this._url.verification,this.loadPAPIUrl()},p.prototype.terminate=function(){try{this.mxp&&this.mxp.close(),this.mxp.destroy(),this.mxp&&delete this.mxp,this._sessionId="",this._sessionSecret="",this.messageClient&&this.messageClient.destroy()}catch(e){}},p.prototype.stop=function(){console.error("Stop is deprecated, use terminate() instead!"),this.terminate()},p.prototype.adjustedTime=function(){var e=(new Date).getTime();return new Date(e+(this.timeDelta||0)).toISOString()},p.prototype.signSession=function(e){try{var t="";if(void 0!==e.data){var n="string"!=typeof e.data?JSON.stringify(e.data):e.data;t=W.MD5(n).toString(W.enc.Base64)}e.headers["Content-Type"]=(e.headers["Content-Type"]||"").replace("utf-8","UTF-8").replace("/json;chars","/json; chars"),e.headers["X-Timestamp"]=e.headers["X-Timestamp"]||this.adjustedTime();var i=e.method+"\n"+t+"\n"+(e.headers["Content-Type"]||"")+"\nx-timestamp:"+e.headers["X-Timestamp"]+"\n"+e.url.match(/^https?:\/\/[^\/]+([^#]*)/)[1];if(this._sessionId.length>0&&this._sessionSecret.length>0){var r=W.HmacSHA256(W.enc.Utf8.parse(i),W.enc.Base64.parse(this._sessionSecret)).toString(W.enc.Base64);e.headers.Authorization="instance "+this._sessionId+":"+r}else e.headers.Authorization="application "+this._appKey;return e.headers}catch(e){throw e}return null},p.prototype.signTicket=function(e,t){return t=t||e.data.authorization,e.headers=e.headers||{},e.headers.Authorization="user "+t,e.headers["X-Timestamp"]=this.adjustedTime(),e.headers},p.prototype.signApp=function(e){try{return e.headers["X-Timestamp"]=e.headers["X-Timestamp"]||this.adjustedTime(),e.headers.Authorization="application "+this._appKey,e.headers}catch(e){throw e}return null},p.prototype.getSession=function(){return{userId:this.user.userId,sessionId:this._sessionId,sessionSecret:this._sessionSecret,pushNotificationDisplayName:this.user.pushNotificationDisplayName}},p.prototype.newUser=function(e,t,n){var i=r.defer();return t=t||function(e){return console.info("User successfully created"),e},n=n||function(e){console.error(e)},this.user.create(e).then(t).then(i.resolve).fail(function(e){this.log(e),n(e),i.reject(e)}.bind(this)),i.promise},p.prototype.start=function(e,t,n){var i=r.defer();if(t=t||function(){this.log(new Notification(0,1,"SinchClient started"))}.bind(this),n=n||function(e){console.error(e)},this.started){var s=new Error("Sinch client already started");n(s),i.reject(s)}else e&&(this.user.pushNotificationDisplayName=e.pushNotificationDisplayName),this.started=!0,this.loadTimeDelta().then(function(e){return this.log(new Notification(0,5,"Get authentication token"),i),this.user.authenticate(e)}.bind(this,e),e).then(function(e){return this.loadSessionId(),e}.bind(this)).then(function(e){return this.log(new Notification(1,5,"Get instance using auth token"),i),e&&e.sessionId&&e.sessionSecret?this.user.resumeSession(e):this.user.initSessKeySecret()}.bind(this)).fail(function(e){if(40400===((e||{response:{}}).response||{}).errorCode)return this.log(new Notification(1,5,"Invalid instance. Will try again without any pre-set instance ID."),i),this._sessionId="",this.user.initSessKeySecret();throw e}.bind(this)).then(function(){return this.log(new Notification(2,5,"Get MXP configuration"),i),this.user.getMXPConf()}.bind(this)).then(function(){this.log(new Notification(3,5,"Create MXP object"),i),this.mxp=new z(this)}.bind(this)).then(function(){if(this._autoStartMxp&&(void 0!==this.messageClient||void 0!==this.callClient))return this.log(new Notification(4,5,"Will start active connection"),i),this.startActiveConnection();this.log(new Notification(4,5,"Will NOT start active connection. This will prevent IM and incoming data calls."),i)}.bind(this)).then(t).then(function(){this.log(new Notification(5,5,"Successfully started SinchClient"),i),i.resolve()}.bind(this)).fail(function(e){this.started=!1,this._sessionId="",this._sessionSecret="",this.log(e),n(e),i.reject(e)}.bind(this));return i.promise},p.prototype.getMessageClient=function(){if("messaging"in this.capabilities&&this.capabilities.messaging)return this.messageClient;throw new SinchError(a.ErrorDomainSDK,c.SDKInternalOther,"No messaging capability, not possible to retrieve messageClient")},p.prototype.getCallClient=function(){if("calling"in this.capabilities&&this.capabilities.calling)return this.callClient;throw new SinchError(a.ErrorDomainSDK,c.SDKInternalOther,"No calling capability, not possible to retrieve callClient")},p.prototype.createSmsVerification=function(e,t){return new j(this,e,t,"sms")},p.prototype.createCalloutVerification=function(e,t){return new E(this,e,t)},p.prototype.createFlashCallVerification=function(e,t){return new j(this,e,t,"flashcall")},p.prototype.createVerification=function(e,t,n){return new j(this,e,t,n.toLowerCase())},p.prototype.startActiveConnection=function(){if(this._onlineCapability&&this.started)return this.log(new Notification(4,5,"Manually starting active connection")),this.mxp.init();if(!this._onlineCapability)throw new SinchError(a.ErrorDomainSDK,c.SDKInternalOther,'No online capability, can not start active connection. Set configuration option "supportActiveConnection" to "true" when instantiating the SinchClient');this._autoStartMxp=!0},p.prototype.stopActiveConnection=function(){if(this._onlineCapability)return this.log(new Notification(4,5,"Manually closing active connection")),this.mxp.close();throw new SinchError(a.ErrorDomainSDK,c.SDKInternalOther,'No online capability, can not start active connection. Set configuration option "supportActiveConnection" to "true" when instantiating the SinchClient')},p.prototype.getVersion=function(){try{return s.version[1]}catch(e){return"dev"}},p.prototype.onnotification=function(e,t){};var d=d||{};function g(e,t,n){this.sinch=e,this.eventListeners=[],this.peerConnections={},this.callId=n||h(),this.callDomain="None",this.callOutbound=void 0,this.fromId="",this.toId="",this.webRtcConfig={iceServers:[{urls:["stun:23.21.150.121","stun:stun.l.google.com:19302"]}]};var i=navigator.userAgent.match(/Chrom[e|ium]\/([0-9]+)\./),r=!!i&&parseInt(i[1],10),s=navigator.userAgent.match(/Firefox\/([0-9]+)\./),o=!!s&&parseInt(s[1],10);(r>=48||o>=42)&&(this.sinch.log(new Notification(0,1,"Chrome >= 48 or FF >= 42 detected, will generate certificate manually for better compatibility")),v.generateCertificate({name:"ECDSA",namedCurve:"P-256"}).then(function(e){this.sinch.log(new Notification(0,1,"New certificate generated and configured!")),this.webRtcConfig.certificates=[e]}.bind(this))),this.outgoingStream=void 0,this.incomingStream=void 0,this.earlymedia=void 0,this.callState=S.INITIATING,this.callEndCause=C.NONE,this.timeProgressing=null,this.timeEstablished=null,this.timeEnded=null,this.error=null,this.autoAnswer=!1,this.autoHangup=!1,this.videoSupport=t||!1,this.clientMap={},this.activeInstance=void 0,this.dataChannels={},this.proxyUrl=void 0,this.customHeaders=void 0,this.joinBuffer={};var a={onCallEnded:function(e){this.sinch.mxp.unsubscribe("signalPubNub")}.bind(this)};this.addEventListener(a);var c="web",u="0";try{c=l().split("/")[0],u=l().split("/")[1]}catch(e){}var p={onCallEnded:function(t){var n=t.getDetails();if(n.startedTime){var i={callId:t.callId,domain:t.callDomain,outbound:t.callOutbound,fromId:t.fromId,toId:t.toId,callTime:new Date(n.startedTime).toISOString(),duration:n.duration,setupDuration:(t.timeEstablished-t.timeProgressing)/1e3||0,result:t.callEndCause,deviceInformation:{ModelId:f()||"unknown",OSName:c,OSVersion:u,SDKPlatform:"js",SDKPlatformVersion:e.getVersion()}};t.sinch.callReporting(i).fail(function(){console.error("Could not report call!")})}t.ffIceTimer&&clearInterval(t.ffIceTimer)}};this.addEventListener(p)}function y(e){this.endCause=e.endCause,this.endedTime=e.endedTime,this.error=e.error,this.establishedTime=e.establishedTime,this.startedTime=e.startedTime,this.duration=e.duration}function m(e,t){if(!(e instanceof p))throw new Error("CallClient can't be instantiated, use getCallClient in an SinchClient instance");var n=navigator.userAgent.toLowerCase();if(n.indexOf("msie")>-1||/Edge/.test(n))throw new Error("SinchClient can't be started with calling capability. Browser not supported.");this.sinch=e,this.eventListeners=[],this.callBuffert={},this.localMediaStream=void 0,this.incomingCallCustomStream=t,this.groupChannel=void 0}v=window.RTCPeerConnection||window.mozRTCPeerConnection||window.webkitRTCPeerConnection||d.RTCPeerConnection,b=window.RTCSessionDescription||window.mozRTCSessionDescription||window.webkitRTCSessionDescription||d.RTCSessionDescription,w=window.RTCIceCandidate||window.mozRTCIceCandidate||d.RTCIceCandidate,g.prototype.addEventListener=function(e){this.eventListeners.push(e)},g.prototype.removeEventListener=function(e){this.eventListeners.splice(this.eventListeners.indexOf(e),1)},g.prototype.setStream=function(e){this.outgoingStream=e,this.execListener("onLocalStream",e)},g.prototype.execListener=function(e,t){this.eventListeners.forEach(function(n){try{return n[e]&&n[e](this,t)}catch(t){var i=new SinchError(a.ErrorDomainSDK,c.SDKInternalOther,"Error executing listener: "+e,t);throw console.error(i),i}}.bind(this))},g.prototype.setEndCause=function(e){this.callEndCause===C.NONE&&(this.callEndCause=e)},g.prototype.setParticipants=function(e,t){this.callOutbound=e==this.sinch.user.userId,this.toId=t,this.fromId=e},g.prototype.progress=function(e){if(this.callState!=S.INITIATING)throw new SinchError(a.ErrorDomainOther,c.OtherOther,"Progress: Invalid call state for progressing",g);this.sinch.log(new Notification(0,1,"Call changing state to PROGRESSING")),this.timeProgressing=new Date,this.callState=S.PROGRESSING,e&&this.execListener("onCallProgressing"),this.autoAnswer&&this.answer(),this.autoHangup&&this.hangup()},g.prototype.establish=function(){this.callState==S.PROGRESSING?(this.sinch.log(new Notification(0,1,"Call changing state to ESTABLISHED")),this.cleanPeerConnections(!1),"connection"!=this.callDomain&&this.unmute(),this.timeEstablished=new Date,this.callState=S.ESTABLISHED,this.execListener("onCallEstablished")):console.log("Call state not in PROGRESSING, cant process second JOIN")},g.prototype.mxpAck=function(e){if(this.sinch.log(new Notification(0,1,"Call ACK Received",e)),this.callState!=S.INITIATING&&this.callState!=S.PROGRESSING)throw new SinchError(a.ErrorDomainOther,c.OtherOther,"Invalid call state for processing Ack",g);this.clientMap[e.getSenderId()]=this.clientMap[e.getSenderId()]||e.getFrom(),this.processRTCAnswer(e).then(function(){"yes"===(e.decrypted.nvps||{}).earlymedia?(this.activeInstance=e.getSenderId(),this.progress(!1),this.establish(),this.earlymedia=!0):this.progress(!0),this.joinBuffer[e.getSenderId()]&&(this.sinch.log(new Notification(0,1,"Buffered JOIN was detected for this Ack, will immediatley process & remove.")),this.mxpJoin(this.joinBuffer[e.getSenderId()]),delete this.joinBuffer[e.getSenderId()])}.bind(this))},g.prototype.processRTCAnswer=function(e){var t=r.defer(),n=this.getPeerConnectionInstance(e.getSenderId());return n.setRelayUrl(this.relayUrl),null==n.offer?(this.sinch.log(new Notification(0,1,"Send deny to instance: "+n.offer)),this.sinch.mxp.callDeny(this,n.instanceId).fail(function(e){}),t.resolve()):this.callState!=S.ENDED&&"media"!=e.decrypted.bt&&null!=e.decrypted.bd?n.setRemoteDescription(new b(JSON.parse(e.decrypted.bd))).then(function(){t.resolve()}.bind(this)):t.resolve(),t.promise},g.prototype.sendCancel=function(e,t){setTimeout(function(){this.setEndCause(e),this.error=new SinchError(a.ErrorDomainSDK,c.SDKInternalOther,t),this.sinch.mxp.callCancel(this).fail(function(e){throw new SinchError(a.ErrorDomainSDK,c.SDKInternalOther,"Error sending call Cancel")}),this.callFailure()}.bind(this),2e3)},g.prototype.mxpPeerEventSdp=function(e){if(this.callState==S.INITIATING||this.callState==S.PROGRESSING)this.disableIce=!0,this.processRTCAnswer(e);else if(this.callState==S.ESTABLISHED){var t=JSON.parse(e.decrypted.bd),n=new b(t),i=this.getPeerConnectionInstance(e.getSenderId());"offer"==t.type?(this.sinch.log(new Notification(0,3,"Got renegotiation SDP Offer",t)),i.setRemoteDescription(n).then(function(){this.sinch.log(new Notification(1,3,"Successfully configured SDP Offer.",t)),i.createAnswer().then(function(t){this.sinch.log(new Notification(2,3,"Successfully created SDP Answer.",t)),this.sinch.mxp.callTxPeerEventSDP(this,t,e.getSenderId()).fail(function(e){throw new SinchError(a.ErrorDomainSDK,c.SDKInternalOther,"Error sending SDP Answer")})}.bind(this)).fail(function(e){console.error("Major error in creating answer",e)})}.bind(this),function(e){throw this.sendCancel(C.FAILURE,e),new SinchError(a.ErrorDomainSDK,c.SDKInternalOther,"Error setting remote SDP")}.bind(this))):"answer"==t.type&&(this.sinch.log(new Notification(0,2,"Got renegotiation SDP Answer",t)),i.setRemoteDescription(RTCdescription,function(){this.sinch.log(new Notification(1,2,"Configured incoming SDP Answer",t))}.bind(this),function(e){throw this.sendCancel(C.FAILURE,e),new SinchError(a.ErrorDomainSDK,c.SDKInternalOther,"Error setting remote SDP")}))}},g.prototype.mxpInjectIce=function(e){if(this.callState!=S.ENDED){this.sinch.log(new Notification(0,2,"Recieved ICE Candidate from B",e));var t=JSON.parse(e.decrypted.bd);t.candidate=t.cand||t.candidate,t.sdpMLineIndex=t.sdpMLI||t.sdpMLineIndex,this.getPeerConnectionInstance(e.getSenderId()).addRemoteIceCandidate(t)}},g.prototype.mxpJoin=function(e){if(this.sinch.log(new Notification(0,1,"Call JOIN Received",e)),this.activeInstance&&this.activeInstance!=e.getSenderId())throw console.error("Can not process JOIN, call in session after previous JOIN"),new SinchError(a.ErrorDomainSession,c.SessionActiveUserLimitReached,"Can not process JOIN, call in session after previous JOIN");var t=e.getSenderId();this.callState==S.INITIATING?(this.sinch.log(new Notification(0,1,"JOIN received before ACK. Will cache JOIN to process after ACK.")),this.joinBuffer[t]=e):r.fcall(function(){var t=r.defer(),n=this.getPeerConnectionInstance(e.getSenderId());return"sdp"===e.decrypted.bt&&e.decrypted.bd&&!n.hasRemoteDescription()?n.setRemoteDescription(new b(JSON.parse(e.decrypted.bd))).then(function(){this.sinch.log(new Notification(1,2,"Configured incoming SDP Join",e.decrypted.bd)),t.resolve()}.bind(this)).fail(function(e){throw this.sendCancel(C.FAILURE,e),new SinchError(a.ErrorDomainSDK,c.SDKInternalOther,"Error setting remote SDP")}):t.resolve(),t.promise}.bind(this)).then(function(){if(this.callState!=S.PROGRESSING&&!this.earlymedia)throw console.error("Can not process JOIN, call in unexpected state. Call state: "+this.getState()),new SinchError(a.ErrorDomainSDK,c.SDKInternalOther,"Can not process JOIN, call in unexpected state.");this.activeInstance=e.getSenderId(),this.sinch.mxp.callJoined(this).then(function(){this.sinch.log(new Notification(0,1,"Successfully sent JOINED",this)),this.earlymedia||this.establish()}.bind(this)).fail(function(e){console.error("Unhandled error in call.mxpJoin.",e)})}.bind(this)).fail(function(e){console.error("Error processing JOIN",e)})},g.prototype.mxpJoined=function(e){(this.sinch.log(new Notification(0,1,"Call JOINED Received",e)),this.callState==S.INITIATING||this.callState==S.PROGRESSING)?JSON.parse(e.decrypted.bd).fi!=this.sinch._sessionId+":"+this.sinch._subInstanceId?(this.setEndCause(C.OTHER_DEVICE_ANSWERED),this.mxpHangup()):this.callState==S.PROGRESSING&&this.establish():console.log("Call state already ESTABLISHED (or ENDED), cant process second JOIN")},g.prototype.mxpHangup=function(e){this.callState!=S.ENDED&&(this.sinch.log(new Notification(0,1,"Call HANGUP Received",e)),this.callState==S.ESTABLISHED?this.setEndCause(C.HUNG_UP):this.setEndCause(C.CANCELED),this.timeEnded=new Date,this.callState=S.ENDED,this.execListener("onCallEnded"),this.cleanPeerConnections(!0))},g.prototype.cleanPeerConnections=function(e){for(var t in this.peerConnections)this.peerConnections[t]&&(e||t!=this.activeInstance)&&(this.peerConnections[t].close(),delete this.peerConnections[t])},g.prototype.mxpDeny=function(e){if(this.callState!=S.ENDED){if(this.sinch.log(new Notification(0,1,"Call DENIED Received",e)),this.setEndCause(C.DENIED),"error/json"==e.decrypted.bt){this.error=new SinchError(a.ErrorDomainApi,c.ApiApiCallFailed,"");var t=JSON.parse(e.decrypted.bd);for(var n in t)this.error[n]=t[n];this.error.message=t.code+" "+t.reason,this.error.mxp=e.decrypted}this.callState==S.INITIATING?(this.autoHangup=!0,this.progress(!0)):"no"==(e.decrypted.nvps||{}).denyall?this.mxpHangup():this.hangup()}},g.prototype.mxpCancel=function(e){if(this.callState!=S.ENDED){this.sinch.log(new Notification(0,1,"Call CANCEL Received",e)),this.timeEnded=new Date,this.callState=S.ENDED;Date.now();this.setEndCause(C.CANCELED),this.execListener("onCallEnded"),this.cleanPeerConnections(!0)}},g.prototype.mxpFail=function(e){if(this.sinch.log(new Notification(0,1,"Call FAILURE Received",e)),"message"==e.decrypted.bt)this.error=new SinchError(a.ErrorDomainApi,c.ApiApiCallFailed,""),this.error.message=e.decrypted.bd,this.error.mxp=e.decrypted;else if("error/json"==e.decrypted.bt){this.error=new SinchError(a.ErrorDomainApi,c.ApiApiCallFailed,"");var t=JSON.parse(e.decrypted.bd);for(var n in t)this.error[n]=t[n];this.error.message=t.code+" "+t.reason,this.error.mxp=e.decrypted}this.callFailure()},g.prototype.callFailure=function(){this.timeEnded=new Date,this.callState=S.ENDED,this.setEndCause(C.FAILURE),this.execListener("onCallEnded"),this.cleanPeerConnections(!0)},g.prototype.addEventListenerPrototype=function(e){e.onOpen&&(this.onopen=e.onOpen),e.onClose&&(this.onclose=e.onClose),e.onMessage&&(this.onmessage=e.onMessage)},g.prototype.setCallTimeouts=function(e,t){setTimeout(function(){this.pushService&&this.pushService.push(!0,this.callState)?this.progress(!0):this.callState==S.INITIATING&&(this.sinch.log(new Notification(0,1,"Call PROGRESSING timeout. Will hangup call.",this)),this.setEndCause(C.TIMEOUT),this.hangup())}.bind(this),e),setTimeout(function(){this.callState==S.PROGRESSING&&(this.sinch.log(new Notification(0,1,"Call ESTABLISHED timeout. Will hangup call.",this)),this.setEndCause(C.NO_ANSWER),this.hangup())}.bind(this),t)},g.prototype.getCallObject=function(e,t){var n={cli:"",destination:{type:{pstn:"number",data:"username",conference:"username",connection:"username",sip:"username"}[t],endpoint:e},callId:this.callId,mediaChannels:["audio"],subinstanceId:this.sinch._subInstanceId,headers:{p2p:"yes"},domain:{pstn:"pstn",data:"data",conference:"conference",connection:"data",sip:"sip"}[t]};return this.sinch._supportVideo&&n.mediaChannels.push("video"),this.customHeaders&&(n.headers.ph=JSON.stringify(this.customHeaders)),"connection"==t&&(n.headers.nomedia=!0),n},g.prototype.getPeerConnectionInstance=function(e){if(e&&this.peerConnections[""])return this.peerConnections[e]=this.peerConnections[""],delete this.peerConnections[""],this.peerConnections[e].updateInstanceId(e),this.peerConnections[e];var t=e||"";return this.peerConnections[t]||(this.peerConnections[t]=new A(e,this.webRtcConfig,this.outgoingStream,this)),this.peerConnections[t]},g.prototype.createInstances=function(e){if(!e)return null;for(var t={},n=0;n<e.length;++n)t[e[n].instanceId]={},t[e[n].instanceId].capabilities=e[n].capabilities;return t},g.prototype.getPlaceCallResponse=function(e){return{body:e.body||e.Body,signalChannel:e.signalChannel||e.SignalChannel,instances:e.instances||e.Instances,encryptionKey:e.encryptionKey||e.EncryptionKey}},g.prototype.placeCall=function(e,t){var n=r.defer();this.callDomain=t,this.setParticipants(this.sinch.user.userId,e),this.setCallTimeouts(this.sinch._progressTimeout||I,_);var i=this.getCallObject(e,t);return this.peerConnection=this.getPeerConnectionInstance(null),this.peerConnection.createOffer({offerToReceiveAudio:!0,offerToReceiveVideo:this.videoSupport}).then(function(t){this.originalOffer=t,i.sdp=t,this.sinch.placeCall(i).then(function(t){var i=this.getPlaceCallResponse(t);this.sinch.log(new Notification(0,1,"Successfully initiated call, waiting for MXP signalling.",i)),this.instances=this.createInstances(i.instances),void 0!==i.signalChannel&&null!==i.signalChannel&&(this.clientMap.virtual={fs:i.signalChannel,fu:e}),this.sinch._supportManagedPush?(this.pushService=new P(this.sinch,this.instances,this.callId),this.pushService.push(!1,this.callState)):this.pushService=null,this.relayUrl=i.body.replace(/(\r\n|\n|\r)/gm,""),this.sinch.mxp.configureMxpSession(this.callId,i.encryptionKey,i.body),n.resolve()}.bind(this)).fail(function(e){this.error=new SinchError(a.ErrorDomainSDK,c.SDKInternalOther,JSON.parse(e.response).message),this.callFailure(),n.reject(error)}.bind(this))}.bind(this),function(e){console.error("Failed to generate SDP Offer"),console.error(e)}),n.promise},g.prototype.updateSdp=function(e){for(var t=e.split("\n"),n="",i=!1,r=!1,s=0;s<t.length;++s)t[s].length>0&&!t[s].startsWith("a=crypto:1")&&(n=n+t[s]+"\n"),t[s].length>0&&t[s].startsWith("a=mid:")&&(r=!0),t[s].length>0&&t[s].startsWith("a=group:BUNDLE")&&(i=!0);return i||(n+="a=group:BUNDLE audio\n"),r||(n+="a=mid:audio\n"),n},g.prototype.ackIncomingCall=function(e){var t=r.defer();this.sinch.log(new Notification(0,1,"Incoming call",this)),this.setCallTimeouts(I,_);var n=JSON.parse(e.decrypted.nvps.sdp);n.sdp=this.updateSdp(n.sdp),this.sinch.log(new Notification(0,1,"Received SDP offer from B",n));var i=new b(n);return this.peerConnection=this.getPeerConnectionInstance(e.getSenderId()),this.peerConnection.setRelayUrl(e.decrypted.bd),this.peerConnection.setRemoteDescription(i).then(function(){this.sinch.log(new Notification(1,3,"Successfully configured sdp offer.",n)),this.peerConnection.createAnswer().then(function(t){this.progress(!1),this.sinch.log(new Notification(2,3,"Header detected, p2p, will proceed with direct peer connection!.",e)),this.sinch.mxp.sendSdpAnswer(this,t).fail(function(e){throw new SinchError(a.ErrorDomainSDK,c.SDKInternalOther,"Error sending SDP Answer")})}.bind(this),function(e){console.error("Major error in creating answer",e)})}.bind(this),function(e){throw this.sendCancel(C.FAILURE,e),new SinchError(a.ErrorDomainSDK,c.SDKInternalOther,"Error setting remote SDP")}.bind(this)),t.promise},g.prototype.answer=function(){if(this.sinch.log(new Notification(0,1,"Answer call initiated, to answer()",this)),this.callState==S.PROGRESSING)this.mediaObj?this.sinch.postMedia(this.mediaObj).then(function(e){var t="audio:ISAC/0.0.0.0/"+e.proxyid+"/"+e.ip+":"+e.port;this.sinch.mxp.joinIncomingCall(this,t).then(function(){this.sinch.log(new Notification(3,3,"Successfully sent updated proxy information in Ack to caller",t))}.bind(this)).fail(function(e){throw console.error(e),new SinchError(a.ErrorDomainSDK,c.SDKInternalOther,"Could not send Ack to Old with MEDIA answer")})}.bind(this)).fail(function(e){throw console.error(e),new SinchError(a.ErrorDomainSDK,c.SDKInternalOther,"Could not send Answer to v1/media")}):this.sinch.mxp.joinIncomingCall(this).fail(function(e){throw new SinchError(a.ErrorDomainSDK,c.SDKInternalOther,"Error sending JOIN (pickup phone).")});else if("undefined"==typeof outgoingStream)this.sinch.log(new Notification(0,1,"Outgoing stream undefined, perhaps early answer. Will set auto answer for future automatic answer.")),this.autoAnswer=!0;else{if(this.callState==S.ENDED||this.callState==S.ESTABLISHED)throw new SinchError(a.ErrorDomainSDK,c.SDKInternalOther,"Call in invalid state to answer.");this.sinch.log(new Notification(0,1,"Stream defined and state in initializing or progressing. Setting auto answer for later retry.")),this.autoAnswer=!0}},g.prototype.openDataChannel=function(e){return void 0===this.dataChannels[e]&&(this.dataChannels[e]=this.getPeerConnectionInstance(this.activeInstance).createDataChannel(e,{reliable:!1}),this.dataChannels[e].addEventListener=this.addEventListenerPrototype.bind(this.dataChannels[e]),this.execListener("onDataChannelAdded",this.dataChannels[e])),this.dataChannels[e]},g.prototype.hangup=function(){if(this.hangupRetries=(this.hangupRetries||0)+1,this.callState==S.ESTABLISHED)this.sinch.mxp.callHangup(this).fail(function(e){throw new SinchError(a.ErrorDomainSDK,c.SDKInternalOther,"Error sending call Hangup")}),this.mxpHangup();else if(!this.callOutbound||this.callState!=S.PROGRESSING&&this.callState!=S.INITIATING)if(this.callOutbound||this.callState!=S.PROGRESSING&&this.callState!=S.INITIATING){if(this.callState==S.ENDED)throw new SinchError(a.ErrorDomainSDK,c.SDKInternalOther,"Call already ended");this.mxpHangup()}else this.callState==S.PROGRESSING?(this.sinch.mxp.callDeny(this).fail(function(e){throw new SinchError(a.ErrorDomainSDK,c.SDKInternalOther,"Error sending call Deny")}),this.setEndCause(C.DENIED),this.mxpHangup()):this.autoHangup=!0;else Object.keys(this.clientMap).length>0||this.hangupRetries>5?(this.sinch.mxp.callCancel(this).fail(function(e){throw new SinchError(a.ErrorDomainSDK,c.SDKInternalOther,"Error sending call Cancel")}),this.mxpHangup()):(this.sinch.log(new Notification(0,1,"Can not hang up call at this time. Will try again in 0.5 seconds (max five retries).")),setTimeout(this.hangup.bind(this),500))},g.prototype.getCallId=function(){return this.callId},g.prototype.getDetails=function(){return new y({endCause:this.callEndCause,endedTime:this.timeEnded,error:this.error,establishedTime:this.timeEstablished,startedTime:this.timeProgressing,duration:this.timeEstablished?(this.timeEnded-this.timeEstablished)/1e3:0})},g.prototype.getDirection=function(){return this.callOutbound?1:0},g.prototype.getRemoteUserId=function(){return this.getDirection()?this.toId:this.fromId},g.prototype.getState=function(){return Object.keys(S).filter(function(e){return S[e]===this.callState}.bind(this))[0]},g.prototype.getEndCause=function(){return Object.keys(C).filter(function(e){return C[e]===this.callEndCause}.bind(this))[0]},g.prototype.getHeaders=function(){return this.customHeaders},g.prototype.sendDTMF=function(e){if(this.activeInstance&&!this.DTMFsender){var t=this.getPeerConnectionInstance(this.activeInstance);t.getSenders?this.DTMFsender=t.getSenders()[0].dtmf:(console.warn("Your browser doesn't support DTMF tone building"),this.DTMFsender=t.createDTMFSender(this.outgoingStream.getAudioTracks()[0]))}return this.DTMFsender&&this.DTMFsender.insertDTMF(e)},g.prototype.mute=function(){if(this.callState!=S.ESTABLISHED&&this.callState!=S.PROGRESSING&&this.callState!=S.INITIATING)throw new SinchError(a.ErrorDomainSDK,c.SDKInternalOther,"Call not in ESTABLISHED state.");this.sinch.log(new Notification(0,1,"Call was muted using mute()."));for(var e=this.outgoingStream.getAudioTracks(),t=0;t<e.length;t++)e[t].enabled=!1},g.prototype.unmute=function(){if(this.callState!=S.ESTABLISHED&&this.callState!=S.PROGRESSING&&this.callState!=S.INITIATING)throw new SinchError(a.ErrorDomainSDK,c.SDKInternalOther,"Call not in ESTABLISHED state.");this.sinch.log(new Notification(0,1,"Call was un-muted using unmute()."));for(var e=this.outgoingStream.getAudioTracks(),t=0;t<e.length;t++)e[t].enabled=!0},navigator.mediaDevices&&(navigator.mediaDevices.getUserMedia=navigator.mediaDevices.getUserMedia||navigator.getUserMedia||navigator.mozGetUserMedia||navigator.webkitGetUserMedia),m.prototype.addEventListener=function(e){this.eventListeners.push(e)},m.prototype.removeEventListener=function(e){this.eventListeners.splice(this.eventListeners.indexOf(e),1)},m.prototype.execListener=function(e,t){var n=0;return this.eventListeners.forEach(function(i){return n++,i[e]&&i[e](t)}.bind(this)),n},m.prototype.initStream=function(e,t){var n=r.defer(),i=!(!this.sinch._supportVideo||t)&&{mandatory:{maxWidth:320,maxHeight:240}};return void 0!==e?(this.sinch.log(new Notification(0,1,"Will wire customStream into call",e)),n.resolve(e)):void 0===this.localMediaStream?(this.sinch.log(new Notification(0,1,"Will retrieve new Mic for stream")),navigator.mediaDevices&&navigator.mediaDevices.getUserMedia({video:i,audio:!0}).then(function(e){this.localMediaStream=e,n.resolve(this.localMediaStream)}).catch(function(e){console.error("Error retrieving media stream",e)})):(this.sinch.log(new Notification(0,1,"Will retrieve cached Mic for stream",this.localMediaStream)),n.resolve(this.localMediaStream)),n.promise},m.prototype.alreadyInCall=function(){if(this.sinch._multiCall)return!1;for(var e in this.callBuffert)if(this.callBuffert[e].callState==S.PROGRESSING||this.callBuffert[e].callState==S.ESTABLISHED)return!0},m.prototype.handleIncomingCall=function(e){this.sinch.log(new Notification(0,1,"Will handle incoming call",e));var t,n=new g(this.sinch,this.sinch._supportVideo,e.mxpSessionId);(e.decrypted.nvps||{}).nomedia?n.callDomain="connection":n.callDomain="data",n.setParticipants(e.decrypted.fu,this.sinch.user.userId),n.customHeaders=JSON.parse((e.decrypted.nvps||{}).ph||"{}"),this.sinch.mxp.configureMxpSession(n.callId,e.decrypted.nvps.key,e.decrypted.bd),n.clientMap[e.getSenderId()]=e.getFrom(),this.callBuffert[n.callId]=n,this.alreadyInCall()?(this.sinch.log(new Notification(0,1,"Already in a call, will hangup incoming call.",e)),this.sinch.mxp.subscribe("signalPubNub").then(function(){this.sinch.mxp.callDeny(n)}.bind(this))):this.execListener("onIncomingCall",n)?("connection"==n.callDomain?(t=r.defer(),t.resolve(null),t.promise):this.initStream(this.incomingCallCustomStream)).then(function(t){return this.execListener("onMediaStream",t),this.sinch.mxp.subscribe("signalPubNub").then(function(){(e.decrypted.nvps||{}).nomedia||n.setStream(t),n.activeInstance=e.getSenderId(),n.proxyUrl=e.decrypted.bd.replace(/(\r\n|\n|\r)/gm,""),n.ackIncomingCall(e).catch(function(e){console.error("Error handling incoming call",e)})}.bind(this))}.bind(this)):this.sinch.log(new SinchError(a.ErrorDomainSDK,c.SDKMissingCallback,"Missing handler, onIncomingCall."))},m.prototype.callUser=function(e,t,n){this.sinch.log(new Notification(0,1,"CallUser method called",e));var i=new g(this.sinch,this.sinch._supportVideo);return i.customHeaders=t,this.initStream(n).then(function(t){return this.sinch.mxp.subscribe("signalPubNub").then(function(){if(i.callState!=S.INITIATING)throw new SinchError(a.ErrorDomainSDK,c.SDKInternalOther,"Error executing user call. Incorrect call state.");i.setStream(t),i.placeCall(e,"data"),this.callBuffert[i.callId]=i}.bind(this))}.bind(this)),i},m.prototype.callSip=function(e,t,n){this.sinch.log(new Notification(0,1,"CallSip method called",e));var i=new g(this.sinch);return i.customHeaders=t,this.initStream(n).then(function(t){return this.sinch.mxp.subscribe("signalPubNub").then(function(){if(i.callState!=S.INITIATING)throw new SinchError(a.ErrorDomainSDK,c.SDKInternalOther,"Error executing user call. Incorrect call state.");i.setStream(t),i.placeCall(e,"sip"),this.callBuffert[i.callId]=i}.bind(this))}.bind(this)),i},m.prototype.connect=function(e,t){this.sinch.log(new Notification(0,1,"connect method called",e));var n=new g(this.sinch);return n.customHeaders=t,this.sinch.mxp.subscribe("signalPubNub").then(function(){if(n.callState!=S.INITIATING)throw new SinchError(a.ErrorDomainSDK,c.SDKInternalOther,"Error executing connect. Incorrect call state.");n.placeCall(e,"connection"),this.callBuffert[n.callId]=n}.bind(this)),n},m.prototype.callPhoneNumber=function(e,t,n){this.sinch.log(new Notification(0,1,"CallPhoneNumber method called",e));var i=new g(this.sinch);return i.customHeaders=t,this.initStream(n,!0).then(function(t){return this.sinch.mxp.subscribe("signalPubNub").then(function(){if(i.callState!=S.INITIATING)throw new SinchError(a.ErrorDomainSDK,c.SDKInternalOther,"Error executing user call. Incorrect call state.");i.setStream(t),i.placeCall(e,"pstn"),this.callBuffert[i.callId]=i}.bind(this))}.bind(this)),i},m.prototype.callConference=function(e,t,n){if(this.sinch.log(new Notification(0,1,"CallConference method called",e)),!(e=""+e)||e.length>64)throw new SinchError(a.ErrorDomainSDK,c.SDKMissingParameter,"Invalid conferenceId. Must be alphanumeric string less than 64 characters in length.");var i=new g(this.sinch);return i.customHeaders=t,this.initStream(n,!0).then(function(t){return this.sinch.mxp.subscribe("signalPubNub").then(function(){if(i.callState!=S.INITIATING)throw new SinchError(a.ErrorDomainSDK,c.SDKInternalOther,"Error executing user call. Incorrect call state.");i.setStream(t),i.placeCall(e,"conference"),this.callBuffert[i.callId]=i}.bind(this))}.bind(this)),i},m.prototype.callGroup=function(e){if(this.sinch.log(new Notification(0,1,"callRoom method called, for group",e)),void 0!==this.groupChannel)throw new SinchError(a.ErrorDomainSDK,c.SDKInternalOther,"Can not call room, already in a room");if(!this.sinch._multiCall)throw new SinchError(a.ErrorDomainSDK,c.SDKInternalOther,"Can not call room, multiCall capability not specified");return this.groupChannel=e,new D(this.sinch,e)};var v,b,w,S={INITIATING:0,PROGRESSING:1,ESTABLISHED:2,ENDED:3,TRANSFERRING:4},C={NONE:0,TIMEOUT:1,CANCELED:6,DENIED:2,FAILURE:4,HUNG_UP:5,NO_ANSWER:3,OTHER_DEVICE_ANSWERED:7,TIMEOUT:1,TRANSFERRED:8},I=10500,_=45e3,x=function(){};function E(e,t,n){if(!(e instanceof p))throw new SinchError(a.ErrorDomainVerification,c.VerificationInvalidInput,"Invalid input to constructor. VerificationClient can not be instantiated, use createSmsVerification in an SinchClient instance",error);if(void 0===t||0==t.toString().length)throw new SinchError(a.ErrorDomainVerification,c.VerificationInvalidInput,"Invalid input to constructor. Valid phone number required (E.164 format ideally)",t);this.sinch=e,this.number=t||null,this.custom=n||null,this.flagVerified=!1}function k(e,t,n){if(!(e instanceof p))throw new SinchError(a.ErrorDomainVerification,c.VerificationInvalidInput,"Invalid input to constructor. VerificationClient can not be instantiated, use createSmsVerification in an SinchClient instance",error);if(void 0===t||0==t.toString().length)throw new SinchError(a.ErrorDomainVerification,c.VerificationInvalidInput,"Invalid input to constructor. Valid phone number required (E.164 format ideally)",t);this.sinch=e,this.number=t||null,this.custom=n||null,this.flagVerified=!1}function D(e,t){this.sinch=e,this.callClient=e.callClient,this.groupChannel=t,this.eventListeners=[],this.callBuffert=[],this.callListeners={onCallProgressing:function(e){this.sinch.log(new Notification(0,1,"Call progressing",e))}.bind(this),onCallEstablished:function(e){this.sinch.log(new Notification(0,1,"Call established",e)),this.execListener("onGroupRemoteCallAdded",e)}.bind(this),onCallEnded:function(e){this.sinch.log(new Notification(0,1,"Call ended",e)),this.execListener("onGroupRemoteCallRemoved",e)}.bind(this)},this.groupListener={onIncomingCall:function(e){e.addEventListener(this.callListeners),setTimeout(function(){e.answer()},450*Object.keys(this.callBuffert).length+Math.random())}.bind(this)},this.callClient.addEventListener(this.groupListener),this.sinch.callClient.initStream().then(function(e){this.sinch.log(new Notification(0,1,"Media stream successfully created",e)),this.execListener("onGroupLocalMediaAdded",e),this.sinch.mxp.broadcastPubNub.publish({channel:t,message:this.sinch.user.userId}),this.sinch.mxp.subscribeNotificationChannel(t)}.bind(this)),this.sinch.onnotification=function(e,n){t==e&&n!=this.sinch.user.userId&&(this.sinch.log(new Notification(0,1,"Will call user in group, after random timeout",n)),setTimeout(function(){var e=this.callClient.callUser(n);this.callBuffert.push(e),e.addEventListener(this.callListeners)}.bind(this),300+Math.round(500*Math.random())))}.bind(this)}function O(e,t){if(this.delivered=[],this.direction=!t,e instanceof H){this.messageId=e.mxpSessionId;var n=JSON.parse(e.decrypted.bd);this.textBody=n.t,this.recipientIds=e.recipientIds,this.senderId=e.decrypted.fu;try{this.headers=e.decrypted.nvps.ph}catch(e){}this.timestamp=new Date}else{if(!(e instanceof Object))throw new SinchError(a.ErrorDomainSDK,c.SDKMissingParameter,"Unsupported message parameters",e);this.messageId=h(),this.recipientIds=e.recipientIds,this.textBody=e.textBody,this.senderId=e.senderId,this.headers=e.publicHeaders,this.timestamp=new Date}}function B(e,t){this.messageId=t,this.recipientId=e,this.timestamp=new Date}function T(e){if(!(e instanceof p))throw new Error("MessageClient can't be instantiated, use getMessageClient in an SinchClient instance");this.sinch=e,this.eventListeners=[],this.messageBuffert={},this.ackBuffert={},this.onMessageDelivered=[],this.emptyLog(),this.messageLogInterval=setInterval(this.commitLog.bind(this),3e4)}x.generateIceCandidate=function(e,t){return"candidate:"+(""+Math.random()).substring(2,7)+" 1 UDP 2130706431 "+e+" "+t+" typ relay raddr 0.0.0.0 rport 0 generation 0\r\n"},x.generateRelayCandidate=function(e,t,n){var i=e.candidate.split(" ");return-1!=i.indexOf("srflx")&&"udp"==i[2].toLowerCase()?new w({candidate:["candidate:"+(""+Math.random()).substring(2,7),i[1],i[2].toUpperCase(),Math.round(i[3]/10),t,n,"typ","relay","raddr",i[4],"rport",i[5],"generation",0].join(" "),sdpMLineIndex:"number"==typeof e.sdpMLI?e.sdpMLI:e.sdpMLineIndex||0,sdpMid:e.sdpMid}):null},E.prototype.initiate=function(e,t){var n=r.defer();if(this.flagVerified){var i=new SinchError(a.ErrorDomainVerification,c.VerificationUnexpectedInitiateError,"Verification already verified, can't perform another callout.");n.reject(i)}else{var s={identity:{type:"number",endpoint:this.number},custom:this.custom,method:"callout",metadata:{os:l(),platform:f(),sdk:"js/"+this.sinch.getVersion()}};this.sinch.log(new Notification(0,1,"Will initiate callout verification using object",s)),this.sinch.confirmUserCallout(s).then(function(i){var r=this;r.sinch.log(new Notification(0,1,"Successfully initiated callout verification with response",i));var s=0,o=function(){r.sinch.queryVerificationById({number:r.number}).then(function(u){switch(r.sinch.log(new Notification(0,1,"Poll result after "+s+"s",u)),u.status){case"SUCCESSFUL":r.sinch.log(new Notification(0,1,"Successfully verified number after "+s+"s")),e&&e(),n.resolve();break;case"PENDING":if(s+=i.callout.pollingInterval,i.callout.pollingInterval>0&&s<i.callout.stopPollingAfter)window.setTimeout(o,1e3*i.callout.pollingInterval);else{var h=new SinchError(a.ErrorDomainVerification,c.VerificationIncorrectCode,"Verification Failed, Timeout");t&&t(h),n.reject(h)}break;case"FAIL":case"ERROR":r.sinch.log(new Notification(0,1,"Verification failed after "+s+"s"));h=new SinchError(a.ErrorDomainVerification,c.VerificationIncorrectCode,"Verification Failed, "+u.reason);t&&t(h),n.reject(h);break;default:r.sinch.log(new Notification(0,1,"Server response not handled at "+s+"s",u))}}).fail(function(e){var i;i=e.status?new SinchError(a.ErrorDomainVerification,c.VerificationServiceError,"Could not poll verification status: "+e.statusText,e.responseText):e,this.sinch.log(i),t&&t(i),n.reject(i)})};window.setTimeout(o,1e3*i.callout.startPollingAfter)}.bind(this)).fail(function(e){var i;i=e.status?new SinchError(a.ErrorDomainVerification,c.VerificationServiceError,"Could not request verification: "+e.statusText,e.responseText):e,this.sinch.log(i),t&&t(i),n.reject(i)}.bind(this))}return n.promise},k.prototype.initiate=function(e,t){var n=r.defer();if(this.flagVerified){var i=new SinchError(a.ErrorDomainVerification,c.VerificationUnexpectedInitiateError,"Verification already verified, can't perform another callout.");n.reject(i)}else{var s={identity:{type:"number",endpoint:this.number},custom:this.custom,method:"flashcall",metadata:{os:l(),platform:f(),sdk:"js/"+this.sinch.getVersion()}};this.sinch.log(new Notification(0,1,"Will initiate flashcall verification using object: ",s)),this.sinch.confirmUserCallout(s).then(function(t){this.sinch.log(new Notification(0,1,"Successfully initiated callout verification with response",t)),e&&e(),n.resolve()}.bind(this)).fail(function(e){var i;i=e.status?new SinchError(a.ErrorDomainVerification,c.VerificationServiceError,"Could not request verification: "+e.statusText,e.responseText):e,this.sinch.log(i),t&&t(i),n.reject(i)}.bind(this))}return n.promise},k.prototype.verify=function(e,t,n){var i=r.defer();if(this.flagVerified)t&&t(this.cachedResponse),i.resolve(this.cachedResponse);else{var s={number:this.number,source:"manual",flashcall:{cli:e},method:"flashcall"};this.sinch.confirmUserSMS(s).then(function(e){this.flagVerified=!0,this.cachedResponse=e,t&&t(e),i.resolve(e)}.bind(this)).fail(function(e){var t;t=e.status?new SinchError(a.ErrorDomainVerification,c.VerificationIncorrectCode,"Could not verify code: "+e.statusText,e.responseText):e,n&&n(t),i.reject(t)}.bind(this))}return i.promise},D.prototype.addEventListener=function(e){this.eventListeners.push(e)},D.prototype.removeEventListener=function(e){this.eventListeners.splice(this.eventListeners.indexOf(e),1)},D.prototype.execListener=function(e,t){var n=0;return this.eventListeners.forEach(function(i){return n++,i[e]&&i[e](t)}.bind(this)),n},D.prototype.hangupGroup=function(){if(void 0===this.callClient.groupChannel)throw new SinchError(a.ErrorDomainSDK,c.SDKInternalOther,"Can not leave room, not in a room");for(var e in this.callBuffert)this.callBuffert[e].hangup();this.callClient.removeEventListener(this.groupListener),this.callClient.groupChannel=void 0},O.prototype.getMXPMessageObj=function(){var e=new H;return e.mxpSessionId=this.messageId,e.decrypted={bd:JSON.stringify({t:this.textBody})},this.headers&&(e.decrypted.nvps={ph:this.headers}),e.recipientIds=this.recipientIds,e},T.prototype.emptyLog=function(){this.logCounters={version:"2.0",sent:0,received:0,failed:0}},T.prototype.commitLog=function(){(this.logCounters.sent||this.logCounters.received||this.logCounters.failed)&&(this.sinch.log(new Notification(0,1,"Will post IM log to backend for statistics",this.logCounters)),this.sinch.messageReporting(this.logCounters).then(this.emptyLog.bind(this)))},T.prototype.destroy=function(){this.commitLog(),clearInterval(this.messageLogInterval)},T.prototype.handleMessage=function(e){var t;e.recipientIds=e.transportObj.participants.reduce(function(e,t){return e.push(t.destination.identity),e}.bind(this),[]);var n=!1;return this.messageBuffert[e.mxpSessionId]?t=this.messageBuffert[e.mxpSessionId]:(t=new O(e,e.decrypted.fu!=this.sinch.user.userId),this.messageBuffert[t.messageId]=t,n=!0),!t.passedToHandler&&(this.eventListeners.forEach(function(e){return t.passedToHandler=!0,e.onIncomingMessage&&e.onIncomingMessage(t)}),n&&this.ackBuffert[t.messageId]&&(this.ackBuffert[t.messageId].forEach(function(e){this.ackMsg(e,t.messageId)}.bind(this)),delete this.ackBuffert[t.messageId]),t.direction||this.logCounters.received++,!0)},T.prototype.addEventListener=function(e){this.eventListeners.push(e)},T.prototype.removeEventListener=function(e){this.eventListeners.splice(this.eventListeners.indexOf(e),1)},T.prototype.send=function(e,t,n){var i=r.defer();if(this.sinch.log(new Notification(0,1,"Send message method called"),i),!(e instanceof O))throw new SinchError(a.ErrorDomainSDK,c.SDKMissingParameter,"Unsupported message parameters",e);return t=t||function(e){return e},n=n||function(e){console.error(e)},r.fcall(function(e){if(void 0===this.sinch.mxp){var t=new SinchError(a.ErrorDomainSDK,c.SDKUnexpectedCall,"Sinch is not ready yet");throw i.reject(t),t}if(e.sent)throw new SinchError(a.ErrorDomainSDK,c.SDKUnexpectedCall,"Message already sent");return e.sent=!0,e}.bind(this),e).then(this.sinch.mxp.sendMessage.bind(this.sinch.mxp)).then(t).then(function(){this.logCounters.sent++}.bind(this)).then(i.resolve).fail(function(e){this.sinch.log(e),n(e),this.logCounters.failed++,i.reject(e)}.bind(this)).progress(function(e){this.sinch.log(e),i.notify(e)}.bind(this)),i.promise},T.prototype.ackMsg=function(e,t){this.messageBuffert[t]&&-1===this.messageBuffert[t].delivered.indexOf(e)?(this.sinch.log(new MXPLog("Recieved ack from "+e+" for message",t)),this.messageBuffert[t].delivered.push(e),this.eventListeners.forEach(function(n){return n.onMessageDelivered&&n.onMessageDelivered(new B(e,t))}.bind(this))):(this.ackBuffert[t]||(this.ackBuffert[t]=[]),this.ackBuffert[t].push(e),this.sinch.log(new MXPLog("Got ack for message with non-existing messageId, storing in ackBuffert",t)))},T.prototype.newMessage=function(e,t,n){if("string"==typeof e&&(e=[e]),"string"!=typeof t)throw new SinchError(a.ErrorDomainSDK,c.SDKUnexpectedCall,"Message text must be a string (for cross device compatability). Please stringify any objects.");if(n&&"string"!=typeof n)throw new SinchError(a.ErrorDomainSDK,c.SDKUnexpectedCall,"Headers must be a string (for cross device compatability). Please stringify any objects.");return new O({recipientIds:e,textBody:t,senderId:this.sinch.user.userId,publicHeaders:n})};d=d||{};function A(e,t,n,i){this.instanceId=e,this.webrtcConfig=t,this.outgoingStream=n,this.call=i,this.peerConnection=this.createPeerConnection(),this.remoteCandidates=[]}function M(e,t,n){this.instanceId=e,this.iceCandidates=[],this.call=t,this.relayIceCandidates=[],this.instance=n}function P(e,t,n){this.sinch=e,this.callId=n,this.instances=t}function N(e,t,n,i,r){this._version=e,this._type=t,this._sessionId=n,this._created=i,this._externalId=r,this._bytes=[]}function SinchError(e,t,n,i){this.name="SinchError",this.domain=e||-1,this.code=t||0,this.response=i||{},this.message=n||"General sinch error",this.stack=new Error(n).stack}function R(e){this.userObj={},this.sinch=e}function j(e,t,n,i){if(!(e instanceof p))throw new SinchError(a.ErrorDomainVerification,c.VerificationInvalidInput,"Invalid input to constructor. VerificationClient can not be instantiated, use createSmsVerification in an SinchClient instance",error);if(void 0===t||0==t.toString().length)throw new SinchError(a.ErrorDomainVerification,c.VerificationInvalidInput,"Invalid input to constructor. Valid phone number required (E.164 format ideally)",t);this.method=i||"sms",this.sinch=e,this.number=t||null,this.custom=n||null,this.flagVerified=!1}v=window.RTCPeerConnection||window.mozRTCPeerConnection||window.webkitRTCPeerConnection||d.RTCPeerConnection,b=window.RTCSessionDescription||window.mozRTCSessionDescription||window.webkitRTCSessionDescription||d.RTCSessionDescription,w=window.RTCIceCandidate||window.mozRTCIceCandidate||d.RTCIceCandidate,A.prototype.updateInstanceId=function(e){this.instanceId=e,this.peerConnectionObserver.updateInstanceId(e)},A.prototype.createPeerConnection=function(){return this.peerConnection=new v(this.webrtcConfig,{optional:[{DtlsSrtpKeyAgreement:!0}]}),this.peerConnectionObserver=new M(this.instanceId,this.call,this),this.peerConnection.addStream(this.outgoingStream),this.peerConnection.ontrack=function(e){e.streams.length>0&&(this.call.incomingStream=e.streams[0],this.call.execListener("onRemoteTrack",this.incomingStream))}.bind(this),this.peerConnection.oniceconnectionstatechange=function(e){this.peerConnectionObserver.onIceConnectionChanged(e)}.bind(this),this.peerConnection.onicecandidate=function(e){this.peerConnectionObserver.onIceCandidate(e)}.bind(this),this.peerConnection.onnegotiationneeded=function(e){this.peerConnectionObserver.onIceCandidate(e)}.bind(this),this.peerConnection.onremovestream=function(e){this.call.sinch.log(new Notification(0,1,"WebRTC: Stream removed",e))}.bind(this),this.peerConnection.onsignalingstatechange=function(e){this.call.sinch.log(new Notification(0,1,"WebRTC: Signaling state change: "+e.currentTarget.signalingState+", instance: "+this.instanceId,e))}.bind(this),this.peerConnection.onidentityresult=function(e){this.call.sinch.log(new Notification(0,1,"WebRTC: onidentityresult event detected",e))}.bind(this),this.peerConnection.onidpassertionerror=function(e){this.call.sinch.log(new Notification(0,1,"WebRTC: onidpassertionerror event detected",e))}.bind(this),this.peerConnection.onidpvalidationerror=function(e){this.call.sinch.log(new Notification(0,1,"WebRTC: onidpvalidationerror event detected",e))}.bind(this),this.peerConnection.onpeeridentity=function(e){this.call.sinch.log(new Notification(0,1,"WebRTC: onpeeridentity event detected",e))}.bind(this),this.peerConnection.onicegatheringstatechange=function(e){this.peerConnectionObserver.onIceGatheringStateChange(e)}.bind(this),this.peerConnection},A.prototype.getLocalDescription=function(e){return null!=this.instanceId&&this.call.originalOffer?this.call.originalOffer:e},A.prototype.createOffer=function(e){var t=r.defer();return this.peerConnection.createOffer(function(e){this.offer=e,t.resolve(e)}.bind(this),function(e){t.fail(e)},e),t.promise},A.prototype.createAnswer=function(){var e=r.defer();return this.peerConnection.createAnswer(function(t){this.peerConnection.setLocalDescription(t,function(){this.call.sinch.log(new Notification(2,3,"Successfully created SDP Answer.",t)),e.resolve(t)}.bind(this),function(t){e.fail(t)})}.bind(this),function(t){e.fail(t)}),e.promise},A.prototype.addRemoteIceCandidates=function(e){if(this.remoteCandidates){for(;this.remoteCandidates.length;){e=this.remoteCandidates.pop();this.call.sinch.log(new Notification(2,2,"Add stored remote candidate, instance: "+this.instanceId,e)),this.peerConnection.addIceCandidate(e)}this.remoteCandidates=null}},A.prototype.addRemoteIceCandidate=function(e){e&&(this.remoteCandidates?(this.call.sinch.log(new Notification(2,2,"Store remote candidate",e)),this.remoteCandidates.push(e)):(this.call.sinch.log(new Notification(2,2,"WebRTC: Add remote candidate, instance: "+this.instanceId,e)),this.peerConnection.addIceCandidate(e)))},A.prototype.setRelayUrl=function(e){if(e){var t=e.split("/")[3].split(":");this.relay={host:t[0],port:t[1]},this.peerConnectionObserver.addRelayCandidates()}},A.prototype.internalSetRemoteDescription=function(e){var t=r.defer();return this.remoteDescription=e,r.fcall(function(){var e=r.defer();if(this.call.callOutbound){var t=this.getLocalDescription(this.offer);this.call.sinch.log(new Notification(2,2,"Set local description",{offer:this.offer,original:t})),this.peerConnection.setLocalDescription(t,function(){e.resolve()},function(t){e.fail(t)})}else e.resolve();return e.promise}.bind(this)).then(function(){this.peerConnection.setRemoteDescription(e,function(){this.call.sinch.log(new Notification(2,2,"Remote description set",e)),this.addRemoteIceCandidates(),t.resolve()}.bind(this),function(e){throw this.remoteDescription=null,new SinchError(a.ErrorDomainSDK,c.SDKInternalOther,"Error setting remote SDP",e)}.bind(this))}.bind(this)).fail(function(e){throw new SinchError(a.ErrorDomainSDK,c.SDKInternalOther,"Error setting local SDP",e)}.bind(this)),t.promise},A.prototype.setRemoteDescription=function(e){if(!this.offer&&this.call.callOutbound){var t=r.defer();return this.createOffer({offerToReceiveAudio:!0,offerToReceiveVideo:this.call.videoSupport}).then(function(){this.internalSetRemoteDescription(e).then(function(){t.resolve()}).fail(function(e){t.reject(e)})}.bind(this)).fail(function(e){}.bind(this)),t.promise}return this.internalSetRemoteDescription(e)},A.prototype.hasRemoteDescription=function(){return null!=this.remoteDescription},A.prototype.close=function(){"closed"!=this.peerConnection.signalingState&&this.peerConnection.close()},M.prototype.updateInstanceId=function(e){this.call.sinch.log("First ack received from: "+e),this.instanceId=e,this.sendIceCandidates()},M.prototype.sendIceCandidates=function(){if(this.iceCandidates){for(;this.iceCandidates.length;)this.sendIceCandidate(this.iceCandidates.pop());this.remoteCandidates=null}},M.prototype.sendIceCandidate=function(e){null!=this.call.instances&&(null==this.instanceId?(this.call.sinch.log(new Notification(0,2,"Send candidate after answer is received",e)),this.iceCandidates.push(e)):(this.call.sinch.log(new Notification(0,2,"Sending ice candidate to: "+this.instanceId,e)),this.call.sinch.mxp.callTxICECandidate(this.call,e,this.instanceId).fail(function(e){throw new SinchError(a.ErrorDomainSDK,c.SDKInternalOther,"Error sending ICE candidate")})))},M.prototype.addRelayCandidates=function(){if(this.relayIceCandidates){for(;this.relayIceCandidates.length>0;){var e=x.generateRelayCandidate(this.relayIceCandidates.pop(),this.instance.relay.host,this.instance.relay.port);e&&(this.call.sinch.log(new Notification(0,1,"Add relay candidate, instance: "+this.instanceId,e)),this.instance.addRemoteIceCandidate(e))}this.relayIceCandidates=null}},M.prototype.addRelayCandidate=function(e){if(this.relayIceCandidates)this.relayIceCandidates.push(e);else{var t=x.generateRelayCandidate(e,this.instance.relay.host,this.instance.relay.port);t&&(this.call.sinch.log(new Notification(0,1,"Add relay candidate, instance: "+this.instanceId,t)),this.instance.addRemoteIceCandidate(t))}},M.prototype.onIceCandidate=function(e){e.candidate&&(this.addRelayCandidate(e.candidate),this.call.sinch.log(new Notification(0,1,"WebRtc: onIceCandidate, instance: "+this.instanceId,e.candidate)),!this.renegotiate&&e.candidate&&this.sendIceCandidate({cand:e.candidate.candidate,candidate:e.candidate.candidate,sdpMLI:e.candidate.sdpMLineIndex,sdpMLineIndex:e.candidate.sdpMLineIndex,sdpMid:e.candidate.sdpMid||""}))},M.prototype.onIceConnectionChanged=function(e){this.call.sinch.log(new Notification(0,1,"WebRTC: Connection state changed: "+e.currentTarget.iceConnectionState+", instance: "+this.instanceId,e)),this.call.renegotiate||!e.currentTarget||"failed"!=e.currentTarget.iceConnectionState&&"disconnected"!=e.currentTarget.iceConnectionState||this.call.sinch.log(new SinchError(a.ErrorDomainNetwork,c.NetworkConnectionTimedOut,"Ice connection failed.",e)),this.call.execListener("onConnectionChange",e.currentTarget.iceConnectionState)},M.prototype.onIceGatheringStateChange=function(e){this.call.sinch.log(new Notification(0,1,"WebRTC: Gathering state change: "+e.currentTarget.iceGatheringState+", instance: "+this.instanceId,e))},M.prototype.onNegotiationNeeded=function(e){},P.prototype.push=function(e,t){if(t!=S.INITIATING&&t!=S.PROGRESSING)return!1;var n=[];for(V in this.instances)this.instances[V].capabilities&&this.instances[V].capabilities.indexOf("push")>-1&&(!e&&this.instances[V].capabilities.indexOf("online")<0||e&&this.instances[V].capabilities.indexOf("online")>-1)&&n.push(V);if(n.length>0){var i=new N(2,1,this.callId,Date.now(),this.sinch.user.userId),r={};r.sinch=i.Encoded(),this.sinch.user.pushNotificationDisplayName&&(r.displayName=this.sinch.user.pushNotificationDisplayName);for(var s={sessionId:this.callId,template:"incoming_call",to:[],params:r},o=0;o<n.length;++o)s.to.push({instance:n[o]});return this.sinch.pushCall({messages:[s]}),!0}return!1},N.prototype.Encoded=function(){return this.encodeChar(this._version),this.encodeChar(this._type),this.encodeSessionId(this._sessionId),this.encodeTimestamp(this._created/1e3),this.encodeChar(this.getUserIdTypeAndLength(0,this._externalId.length)),this.encodeString(this._externalId),this.base64Encode()},N.prototype.encodeChar=function(e){this._bytes.push(e)},N.prototype.encodeSessionId=function(e){var t=0;for(this._bytes.push(e==e.toLowerCase()?1:2);t<e.length;)"-"!=e.substring(t,t+1)?(this._bytes.push(parseInt(e.substr(t,2),16)),t+=2):++t},N.prototype.encodeTimestamp=function(e){this.encodeChar(255&e),this.encodeChar((65280&e)>>8),this.encodeChar((16711680&e)>>16),this.encodeChar((4278190080&e)>>24)},N.prototype.encodeString=function(e){for(var t=0;t<e.length;++t)this._bytes.push(e.charCodeAt(t))},N.prototype.getUserIdTypeAndLength=function(e,t){return 127&t|e<<7},N.prototype.base64Encode=function(){for(var e,t="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/".split(""),n=this._bytes,i="",r=0;r<n.length;r+=3)i+=t[n[r]>>2],i+=t[(3&n[r])<<4|n[r+1]>>4],void 0!==n[r+1]?i+=t[(15&n[r+1])<<2|n[r+2]>>6]:i+="=",void 0!==n[r+2]?i+=t[63&n[r+2]]:i+="=";for(e=i.slice(0,64),r=1;r<Math.ceil(i.length/64);r++)e+=i.slice(64*r,64*r+64)+(Math.ceil(i.length/64)==r+1?"":"\n");return e},SinchError.prototype=Error.prototype,R.prototype.updateUser=function(e){var t=r.defer();return this.sinch.updateUser(e).then(function(e){this.userObj=e,t.resolve(e)}.bind(this)).fail(function(e){t.reject(e)}.bind(this)),t.promise},R.prototype.create=function(e){var t=r.defer(),n={password:e.password,identities:[]};return e.email&&(n.profile={contact:{email:e.email}},n.identities.push({type:"email",endpoint:e.email})),e.username&&n.identities.push({type:"username",endpoint:e.username}),e.number&&n.identities.push({type:"number",endpoint:e.number}),this.sinch.createUser(n).then(function(e){this.userObj=e,this.userId=e.user.identities.reduce(function(e,t){return"username"===t.type?t.endpoint:e+""},""),t.resolve(e)}.bind(this)).fail(function(e){t.reject(new SinchError(a.ErrorDomainApi,c.ApiApiCallFailed,e.data.errorCode+" "+e.data.message,e.data))}),t.promise},R.prototype.authenticate=function(e){if("object"!=typeof e)throw new SinchError(a.ErrorDomainSDK,c.SDKMissingParameter,'No valid identity or authentication ticket. If you are passing your own authentication tickets, ensure it is an object on the format {"userTicket":SOME_TICKET}',e);if(e.expiresIn=e.expiresIn||86400,e.sessionId&&e.sessionSecret)return e;var t=r.defer(),n="";if(this.sinch._appSecret)e=o(this.sinch._appKey,this.sinch._appSecret,e);else if("email"in e){if(n=this.sinch.authenticate,""==e.email)return t.reject(new SinchError(a.ErrorDomainSDK,c.SDKMissingParameter,"Email is empty",e)),t.promise}else if("username"in e){if(n=this.sinch.authenticateUsername,""==e.username)return t.reject(new SinchError(a.ErrorDomainSDK,c.SDKMissingParameter,"Username is empty",e)),t.promise}else if("number"in e&&(n=this.sinch.authenticateNumber,""==e.number))return t.reject(new SinchError(a.ErrorDomainSDK,c.SDKMissingParameter,"Number is empty",e)),t.promise;if(e.authorization||e.userTicket){if(e.userTicket&&!e.user){var i=e.userTicket.split(":"),s=JSON.parse(atob(i[0]));"username"===!s.identity.type&&t.reject(new SinchError(a.ErrorDomainSDK,c.SDKMissingParameter,"Username missing in userTicket JSON object.",e)),e.user={identities:[s.identity]}}this.userObj=e,this.userObj.authorization=e.authorization||e.userTicket,this.userId=e.user.identities.reduce(function(e,t){return"username"===t.type?t.endpoint:e+""},""),t.resolve()}else n?n(e).then(function(e){this.userObj=e,this.userId=e.user.identities.reduce(function(e,t){return"username"===t.type?t.endpoint:e+""},""),t.resolve()}.bind(this)).fail(function(e){t.reject(new SinchError(a.ErrorDomainApi,c.ApiApiCallFailed,e.data.errorCode+" "+e.data.message,e.data))}):t.reject(new SinchError(a.ErrorDomainSDK,c.SDKMissingParameter,"No valid identity or authentication ticket",e));return t.promise},R.prototype.initSessKeySecret=function(){var e=r.defer(),t={};t.version={os:l()||"unknown",platform:f()||"unknown",sdk:"js/"+this.sinch.getVersion()},t.services={calling:[]},this.sinch._onlineCapability&&t.services.calling.push("online"),this.sinch.capabilities.messaging&&t.services.calling.push("im"),this.sinch.capabilities.calling&&(t.services.calling.push("voip"),t.services.calling.push("p2p"),t.services.calling.push("srtp")),t.authorization=this.userObj.authorization;var n=""!==this.sinch._sessionId;return n&&(t.instanceId=this.sinch._sessionId),t.expiresIn=31536e3,this.sinch[n?"renewSecret":"getInstance"](t).then(function(t){this.sinch.config({sessionId:t.id,sessionSecret:t.secret}),e.resolve()}.bind(this)).fail(function(t){this.sinch._sessionId="",this.sinch._sessionSecret="",e.reject(new SinchError(a.ErrorDomainApi,c.ApiApiCallFailed,t.data.errorCode+" "+t.data.message,t.data))}.bind(this)),e.promise},R.prototype.resumeSession=function(e){var t=r.defer();return this.userId=e.userId,this.sinch.config(e),this.sinch.getUserProfile().then(function(e){this.userObj=e,t.resolve()}.bind(this)).fail(function(e){e instanceof SinchError?t.reject(e):t.reject(new SinchError(a.ErrorDomainApi,c.ApiApiCallFailed,e.data.errorCode+" "+e.data.message,e.data))}),t.promise},R.prototype.getMXPConf=function(){var e=r.defer();return this.sinch.getConfiguration().then(function(t){this.mxpConfig=t,e.resolve()}.bind(this)).fail(function(t){e.reject(new SinchError(a.ErrorDomainApi,c.ApiApiCallFailed,t.data.errorCode+" "+t.data.message,t.data))}),e.promise},j.prototype.request=function(e,t){var n=r.defer();if(this.flagVerified){var i=new SinchError(a.ErrorDomainVerification,c.VerificationUnexpectedInitiateError,"Verification already verified, can't request new code.");n.reject(i)}else{var s={identity:{type:"number",endpoint:this.number},custom:this.custom,method:this.method,metadata:{os:l(),platform:f(),sdk:"js/"+this.sinch.getVersion()}};this.sinch.verify(s).then(function(t){e&&e(),n.resolve()}.bind(this)).fail(function(e){var i;i=e.status?new SinchError(a.ErrorDomainVerification,c.VerificationServiceError,"Could not request verification: "+e.statusText,e.responseText):e,t&&t(i),n.reject(i)}.bind(this))}return n.promise},j.prototype.verify=function(e,t,n){var i=r.defer();if(this.flagVerified)t&&t(this.cachedResponse),i.resolve(this.cachedResponse);else{var s={number:this.number,source:"manual",sms:"sms"==this.method?{code:e}:null,flashcall:"flashcall"==this.method?{cli:e}:null,method:this.method||"sms"};this.sinch.confirmVerification(s).then(function(e){this.flagVerified=!0,this.cachedResponse=e,t&&t(e),i.resolve(e)}.bind(this)).fail(function(e){var t;t=e.status?new SinchError(a.ErrorDomainVerification,c.VerificationIncorrectCode,"Could not verify code: "+e.statusText,e.responseText):e,n&&n(t),i.reject(t)}.bind(this))}return i.promise},j.prototype.initiate=function(e,t){return this.request(e,t)},j.prototype.retry=function(e,t){return this.request(e,t)};var U=function(e){var t=e.key,n=e.decrypted;e.mxpSessionId;try{var i=W.enc.Utf8.parse(JSON.stringify(n));t=W.enc.Base64.parse(t);var r=W.lib.WordArray.random(16),s=W.AES.encrypt(i,t,{iv:r}),o=W.enc.Hex.parse(r.toString(W.enc.Hex)+s.ciphertext.toString(W.enc.Hex))}catch(t){throw t.message=e.message,new K(a.ErrorDomainOther,c.OtherOther,"MXPEncrypt error: "+t.message,t)}return e.encrypted=o.toString(W.enc.Base64),e},L=function(e){try{var t=e.key,n=e.message.split(" ")[5],i=W.enc.Base64.parse(n).toString(W.enc.Hex),r=W.enc.Hex.parse(i.substr(0,32)),s=W.enc.Hex.parse(i.substr(32)),o=W.lib.CipherParams.create({ciphertext:s,salt:null}),u=W.AES.decrypt(o,W.enc.Base64.parse(t),{iv:r}).toString(W.enc.Utf8),h=u.indexOf("{"),l=u.lastIndexOf("}")+1;u=u.substring(h,l),e.decrypted=JSON.parse(u)}catch(t){throw t.message=e.message,new K(a.ErrorDomainOther,c.OtherOther,"MXPDecrypt error: "+t.message,t)}return e};function K(e,t,n,i){this.name="MXPError",this.domain=e||-1,this.code=t||0,this.response=i||{},this.message=n||"General MXP error",this.stack=new Error(n).stack}function H(e,t,n){this.decrypted={};for(var i in e)if("object"==typeof e[i]){e[i]instanceof Array?this[i]=[]:this[i]={};for(var r in e[i])this[i][r]=e[i][r]}else this[i]=e[i];if(t instanceof g){t.activeInstance&&n&&(this.decrypted.nvps=this.decrypted.nvps||{},this.decrypted.nvps.to=t.activeInstance),this.txChannels=[];for(var s in t.clientMap)"virtual"!=s&&-1===this.txChannels.indexOf(t.clientMap[s].fs)&&this.txChannels.push(t.clientMap[s].fs);0==this.txChannels.length&&"virtual"in t.clientMap&&this.txChannels.push(t.clientMap.virtual.fs),this.sub="signalPubNub"}}function z(e){this.sinch=e,this.user=e.user,this.rtcConfiguration=e.user.mxpConfig.rtcConfiguration,this.rtcProfile=e.user.mxpConfig.rtcProfile,this.broadcastPubNub=PUBNUB({publish_key:this.rtcConfiguration.broadcastNetwork.publishKey,subscribe_key:this.rtcConfiguration.broadcastNetwork.subscribeKey,ssl:!0,origin:this.rtcConfiguration.broadcastNetwork.host}),this.signalPubNub=PUBNUB({publish_key:this.rtcConfiguration.signalNetwork.publishKey,subscribe_key:this.rtcConfiguration.signalNetwork.subscribeKey,ssl:!0,origin:this.rtcConfiguration.signalNetwork.host}),this.messageBuffert={},this.transportBuffert={},this.sessionBuffert={},this.unencryptedFrames={},this.broadcastPubNub.sinchStack={},this.broadcastPubNub.sinchStack[this.rtcProfile.broadcastChannel]=[],this.broadcastPubNub.sinchStack[this.rtcProfile.transportChannel]=[],this.signalPubNub.sinchStack={},this.signalPubNub.sinchStack[this.rtcProfile.signalChannel]=[]}function MXPError(e,t,n,i){this.name="MXPError",this.domain=e||-1,this.code=t||0,this.response=i||{},this.message=n||"General MXP error",this.stack=new Error(n).stack}function MXPLog(e,t){this.message=e,this.object=t}H.prototype.getSenderId=function(){if(void 0===this.decrypted.fi)throw new SinchError(a.ErrorDomainSDK,c.SDKInternalError,"getSenderId failed, no from instance defined",{});return this.decrypted.fsi?this.decrypted.fi+this.decrypted.fsi||"virtual":(this.decrypted.nvps||{}).fsi?this.decrypted.fi+this.decrypted.nvps.fsi||"virtual":this.decrypted.fi||"virtual"},H.prototype.getFrom=function(){return{fc:this.decrypted.fc,fd:this.decrypted.fd,fi:this.decrypted.fi,fsi:this.decrypted.fsi,fs:this.decrypted.fs,fu:this.decrypted.fu}},H.prototype.getInstanceId=function(){return this.decrypted.fi?this.decrypted.fi.split(":")[0]:null},z.prototype.init=function(){return this.subscribe("broadcastPubNub")},z.prototype.close=function(){var e=this.broadcastPubNub,t=this.signalPubNub;return setTimeout(function(){e&&e.offline(),t&&t.offline()}.bind(this),1e4),r.all([this.unsubscribe("broadcastPubNub"),this.unsubscribe("signalPubNub")])},z.prototype.destroy=function(){delete this.broadcastPubNub,delete this.signalPubNub},z.prototype.subscribe=function(e){var t=r.defer(),n={restore:!1,connect:function(e){t.resolve()}.bind(this),channel:Object.keys(this[e].sinchStack),callback:this._onmessagePubNub.bind(this),disconnect:this._ondisconnectPubNub.bind(this),error:this._onerrorPubNub.bind(this)},i=!0;for(var s in this[e].sinchStack)i&=0==this[e].sinchStack[s].length,this[e].sinchStack[s].push(!0);return i?this[e].subscribe(n):t.resolve(),t.promise},z.prototype.subscribeNotificationChannel=function(e){var t=r.defer();this.broadcastPubNub.sinchStack[e]=[];var n={restore:!1,connect:function(e){t.resolve()}.bind(this),channel:e,callback:function(t){this.sinch.onnotification(e,t)}.bind(this),disconnect:this._ondisconnectPubNub.bind(this),error:this._onerrorPubNub.bind(this)};return this.broadcastPubNub.subscribe(n),t.promise},z.prototype.unsubscribe=function(e){var t=!0;for(var n in this[e].sinchStack)this[e].sinchStack[n].pop(),t&=0==this[e].sinchStack[n].length;t&&this[e].unsubscribe({channel:Object.keys(this[e].sinchStack)})},z.prototype.signalStatus=function(){return this.signalPubNub.sinchStack[this.rtcProfile.signalChannel].length>0},z.prototype._onmessagePubNub=function(e){this.sinch.log(new MXPLog("Recieved message",e)),r.fcall(this.collectFrames.bind(this),e).then(this.identifyKey.bind(this)).then(L).then(this.handleMessage.bind(this)).fail(function(t){if(t instanceof K){var n=e.split(" ")[1];this.unencryptedFrames[n]=this.unencryptedFrames[n]||[],this.unencryptedFrames[n].push(t.response.message)}else this.handleError(t)}.bind(this))},z.prototype.configureMxpSession=function(e,t,n){this.sessionBuffert[e]={key:t,body:n},this.processUnencryptedForKey(e)},z.prototype.processUnencryptedForKey=function(e){for(var t in this.unencryptedFrames[e])this._onmessagePubNub(this.unencryptedFrames[e][t]),delete this.unencryptedFrames[e][t]},z.prototype._ondisconnectPubNub=function(e){this.sinch.log(new MXPLog("Was disconnected!",e))},z.prototype._onerrorPubNub=function(e){var t=new MXPError(a.ErrorDomainNetwork,c.NetworkConnectionRefused,"PubNub error",e);this.sinch.log(t)},z.prototype.collectFrames=function(e){var t=r.defer(),n=e.split(" "),i=n[1]+n[2];try{n[3]=parseInt(n[3]),n[4]=parseInt(n[4])}catch(e){console.error("Could not parse MXP indices. Malformatted MXP message.")}if(1===n[4])t.resolve(e);else if((this.messageBuffert[i]||(this.messageBuffert[i]={}))[n[3]]=n[5],Object.keys(this.messageBuffert[i]).length==n[4]){var s=n[0]+" "+n[1]+" "+n[2]+" 0 1 ";for(var o in this.messageBuffert[i])s+=this.messageBuffert[i][o];void 0!==n[6]&&(s+=" "+n[6]),this.sinch.log(new MXPLog("All frames collected and merged, full array",this.messageBuffert[i])),delete this.messageBuffert[i],t.resolve(s)}else t.reject(new MXPLog("All frames not yet gathered",this.messageBuffert[i]));return t.promise},z.prototype.identifyKey=function(e){this.sinch.log(new MXPLog("Will identify key",e));var t,n=r.defer(),i=e.trim().split(" ");return void 0!==(t=i[6])?(this.sinch.log(new MXPLog("Transport key identified",e)),this.getTransport(t).then(function(r){n.resolve(new H({mxpSessionId:i[1],message:e,transportId:t,transportObj:r,key:this.transportBuffert[t].key,keyType:"T"}))}.bind(this)).fail(function(e){n.reject(e)}.bind(this))):void 0!==(this.sessionBuffert[i[1]]||{}).key?(this.sinch.log(new MXPLog("Session key in buffert identified",e)),n.resolve(new H({mxpSessionId:i[1],message:e,key:this.sessionBuffert[i[1]].key,keyType:"S"}))):(this.sinch.log(new MXPLog("No key, fall back on instance key",e)),n.resolve(new H({mxpSessionId:i[1],message:e,key:this.rtcProfile.key,keyType:"I"}))),n.promise},z.prototype.handleMessage=function(e){this.sinch.log(new MXPLog("Will handle message",e));var t=r.defer(),n=e.decrypted.md+"_"+(e.decrypted.bt||"null");return this.sinch.logMxp(new function(e,t){this.handler=e,this.object=t}(n,e)),G[n]?G[n].call(this,e):t.reject(new MXPError(a.ErrorDomainOther,c.OtherOther,"Handler not implemented: "+n,{})),t.promise},z.prototype.handleError=function(e){this.sinch.log(e),e.stack&&console.error(e.stack)},z.prototype.getTransport=function(e){var t=r.defer();if(e.constructor==String){var n=e;void 0!==this.transportBuffert[n]?(this.sinch.log(new MXPLog("Got transport from Buffert",this.transportBuffert[n])),t.resolve(this.transportBuffert[n])):this.sinch.getTransportById({transportId:n}).then(function(e){this.sinch.log(new MXPLog("Got new transport",e)),this.transportBuffert[n]=e,t.resolve(this.transportBuffert[n])}.bind(this))}else{if(e instanceof H||e instanceof Array){var i=e instanceof H?e.recipientIds:e,s=(i=i.filter(function(e,t,n){return n.indexOf(e)===t})).indexOf(this.user.userId);s>-1&&i.splice(s,1);var o=[];i.forEach(function(e){if("string"==typeof e)o.push({identity:e});else if(e instanceof Object)for(var t in e)o.push({identity:e[t],type:t})}),i.push(this.user.userId),i=i.sort();var u=btoa(JSON.stringify(i));if(this.transportBuffert[u]){var h=this.transportBuffert[u];this.sinch.log(new MXPLog("Got cached transport for recipient(s)",h)),e instanceof H?(e.transportObj=h,e.transportId=e.transportObj.transportId,t.resolve(e)):t.resolve(h)}else this.sinch.getTransportByParticipants(o).then(function(n){n.participants.forEach(function(e){e.capabilityUnion=[],(e.instances||[]).forEach(function(t){e.capabilityUnion=e.capabilityUnion.concat(t.capabilities)}),e.capabilityUnion=e.capabilityUnion.filter(function(t,n){return e.capabilityUnion.indexOf(t)==n})});var r=[];if(n.participants.forEach(function(e){-1===e.capabilityUnion.indexOf("im")&&-1===e.capabilityUnion.indexOf("im.1")&&r.push(e.destination.identity)}),r.length>0)throw new SinchError(a.ErrorDomainCapability,c.CapabilityCapabilityMissing,"User missing capability",r);n.participants.unshift({channel:this.rtcProfile.transportChannel,destination:{identity:this.user.userId}});var s=n.participants.reduce(function(e,t){return e.push(t.destination.identity),e}.bind(this),[]),o=i.filter(function(e){return s.indexOf(e)<0});if(i.length!=n.participants.length)throw new MXPError(a.ErrorDomainCapability,c.CapabilityUserNotFound,"User does not exist",o);this.sinch.log(new MXPLog("Got new transport for recipient(s)",n)),this.transportBuffert[u]=n,e instanceof H?(e.transportObj=n,e.transportId=e.transportObj.transportId,t.resolve(e)):t.resolve(n)}.bind(this)).fail(function(e){t.reject(e)});return t.promise}t.reject(new MXPError(a.ErrorDomainOther,c.OtherOther,"Unknown transport ID",n))}return t.promise},z.prototype.sendMXP=function(e){var t=r.defer();return e.sub=e.sub||"broadcastPubNub",r.fcall(this.constructMXP.bind(this),e).then(this.identifyEnKey.bind(this)).then(U).then(this.splitFrames.bind(this)).then(this.getTxChannels.bind(this)).then(this.transmitFrames.bind(this)).then(function(e){t.resolve(e)}).fail(function(e){console.error(e.stack),console.error(e),t.reject(e)}).progress(function(e){t.notify(e)}),t.promise},z.prototype.constructMXP=function(e){return e.decrypted.fu=this.user.userId,e.decrypted.fi=this.sinch._sessionId+":"+this.sinch._subInstanceId,e.decrypted.fd=this.sinch._sessionId,e.decrypted.fc="",this.sinch.log(new MXPLog("Added meta data to MXP message",e)),e},z.prototype.identifyEnKey=function(e){return e.transportObj?(e.transportId=e.transportObj.transportId,e.key=e.transportObj.key,e.keyType="T",e.decrypted.fs=this.rtcProfile.transportChannel):(e.key=this.sessionBuffert[e.mxpSessionId].key,e.keyType="S",e.decrypted.fs=this.rtcProfile.signalChannel),this.sinch.log(new MXPLog("Identified Encoding Key",e)),e},z.prototype.splitFrames=function(e){e.encodedFrames=[];var t=1500;t-=e.mxpSessionId.length,t-=(e.transportId||"").length,t-=9,t-=6;do{e.encodedFrames.push(e.encrypted.slice(0,t)),e.encrypted=e.encrypted.substring(t)}while(e.encrypted.length>0);var n=Math.floor(2e9*Math.random());for(var i in e.encodedFrames)e.encodedFrames[i]="10 "+e.mxpSessionId+" "+(e.encodedFrames.length>1?n:"-")+" "+i+" "+e.encodedFrames.length+" "+e.encodedFrames[i],e.transportId&&(e.encodedFrames[i]+=" "+e.transportId);return this.sinch.log(new MXPLog("Split message into frames as needed",e)),e},z.prototype.getTxChannels=function(e){return e.txChannels=e.txChannels||[],e.transportObj&&e.transportObj.participants.forEach(function(t){e.txChannels.push(t.channel)}),this.sinch.log(new MXPLog("Identified Tx Channels",e)),e},z.prototype.transmitFrames=function(e){var t=r.defer();this.sinch.logMxp(new function(e,t){this.handler=e,this.object=t}(e.decrypted.md+"_"+(e.decrypted.bt||"null"),e));var n,i=[];return n=e.transportObj?e.transportObj.participants.length*e.encodedFrames.length:e.encodedFrames.length,i.length==n&&t.resolve(e),e.txChannels.forEach(function(r){e.encodedFrames.forEach(function(s){this.sinch.log(new MXPLog("Transmitting [channel, frame]",[r,s])),this[e.sub].publish({channel:r,message:s,callback:function(r){i.push(r),t.notify(new Notification(i.length,n,"MXP Message send progress (frame Tx)")),i.length==n&&setTimeout(function(){t.resolve(e)},1e3)},error:function(e){console.error("PubNub: Error sending frame",e),t.reject(new MXPError(a.ErrorDomainOther,c.OtherOther,"PubNub: Error sending frame",e))}})}.bind(this))}.bind(this)),t.promise},MXPError.prototype=Error.prototype;z.prototype.joinIncomingCall=function(e,t){var n=r.defer(),i=new H({mxpSessionId:e.callId},e,!0);return i.decrypted.bd=t||null,i.decrypted.md=3,i.decrypted.bt=t?"media":"sdp",i.decrypted.bv=10,this.sendMXP(i).then(function(){n.resolve()}).fail(function(e){n.reject(e)}).progress(function(e){n.notify(e)}.bind(this)),n.promise},z.prototype.callJoined=function(e){var t=r.defer(),n=new H({mxpSessionId:e.callId},e);return n.decrypted.bd=JSON.stringify(e.clientMap[e.activeInstance]),n.decrypted.md=4,n.decrypted.bt="client",n.decrypted.bv=10,n.decrypted.nvps&&delete n.decrypted.nvps.to,this.sendMXP(n).then(function(){t.resolve()}).fail(function(e){t.reject(e)}).progress(function(e){t.notify(e)}.bind(this)),t.promise},z.prototype.sendSdpAnswer=function(e,t){var n=r.defer(),i=new H({mxpSessionId:e.callId},e);return i.decrypted.bd=t?JSON.stringify(t):null,i.decrypted.md=2,i.decrypted.bt=t?"sdp":null,i.decrypted.bv=10,this.sendMXP(i).then(function(){n.resolve()}).fail(function(e){n.reject(e)}).progress(function(e){n.notify(e)}.bind(this)),n.promise},z.prototype.callHangup=function(e){var t=r.defer(),n=new H({mxpSessionId:e.callId},e);return n.decrypted.md=5,n.decrypted.bv=10,this.sendMXP(n).then(function(){t.resolve()}).fail(function(e){t.reject(e)}).progress(function(e){t.notify(e)}.bind(this)),t.promise},z.prototype.callDeny=function(e,t){var n=r.defer(),i=new H({mxpSessionId:e.callId},e);return i.decrypted.md=6,i.decrypted.bv=10,t&&(i.decrypted.nvps=i.decrypted.nvps||{},i.decrypted.nvps.to=t||"undefined",i.decrypted.nvps.denyall="no"),this.sendMXP(i).then(function(){n.resolve()}).fail(function(e){n.reject(e)}).progress(function(e){n.notify(e)}.bind(this)),n.promise},z.prototype.callCancel=function(e){var t=r.defer(),n=new H({mxpSessionId:e.callId},e);return n.decrypted.md=7,n.decrypted.bv=10,this.sendMXP(n).then(function(){t.resolve()}).fail(function(e){t.reject(e)}).progress(function(e){t.notify(e)}.bind(this)),t.promise},z.prototype.callTxICECandidate=function(e,t,n){var i=r.defer(),s=new H({mxpSessionId:e.callId},e);return s.decrypted.bd=JSON.stringify(t),s.decrypted.md=10,s.decrypted.bt="sdp",s.decrypted.bv=10,n&&(s.decrypted.nvps=s.decrypted.nvps||{},s.decrypted.nvps.to=n||"undefined"),this.sendMXP(s).then(function(){i.resolve()}).fail(function(e){i.reject(e)}).progress(function(e){i.notify(e)}.bind(this)),i.promise},z.prototype.callTxPeerEventSDP=function(e,t,n){var i=r.defer(),s=new H({mxpSessionId:e.callId},e);return s.decrypted.bd=JSON.stringify(t),s.decrypted.md=10,s.decrypted.bt="sdp",s.decrypted.bv=10,s.decrypted.nvps=s.decrypted.nvps||{},s.decrypted.nvps.to=n||"undefined",this.sendMXP(s).then(function(){i.resolve()}).fail(function(e){i.reject(e)}).progress(function(e){i.notify(e)}.bind(this)),i.promise},z.prototype.msgToMe=function(e){return!e.decrypted.nvps||!e.decrypted.nvps.to||e.decrypted.nvps.to==this.sinch._sessionId+":"+this.sinch._subInstanceId},z.prototype.msgToMe2=function(e){return!e.decrypted.nvps||!e.decrypted.nvps.to||e.decrypted.nvps.to==this.sinch._sessionId};var F={"1_media":function(e){this.msgToMe2(e)?(function(){if(void 0===this.sinch.callClient){var e=new MXPError(a.ErrorDomainCapability,c.CapabilityCapabilityMissing,"Can not process call signal messages. Call capability not set.");this.sinch.log(e)}}.call(this),this.sinch.callClient&&this.sinch.callClient.handleIncomingCall(e)):this.sinch.log(new Notification(0,1,"Received INVITE message not meant for this instance, nvps.to header set to foreign instance id",e))},"2_null":function(e){this.sinch.callClient&&this.sinch.callClient.callBuffert[e.mxpSessionId]&&this.sinch.callClient.callBuffert[e.mxpSessionId].mxpAck(e)},"2_media":function(e){this.sinch.callClient&&this.sinch.callClient.callBuffert[e.mxpSessionId]&&this.sinch.callClient.callBuffert[e.mxpSessionId].mxpAck(e)},"2_sdp":function(e){this.sinch.callClient&&this.sinch.callClient.callBuffert[e.mxpSessionId]&&this.sinch.callClient.callBuffert[e.mxpSessionId].mxpAck(e)},"3_media":function(e){this.sinch.callClient&&this.sinch.callClient.callBuffert[e.mxpSessionId]&&this.sinch.callClient.callBuffert[e.mxpSessionId].mxpJoin(e)},"3_sdp":function(e){this.sinch.callClient&&this.sinch.callClient.callBuffert[e.mxpSessionId]&&this.sinch.callClient.callBuffert[e.mxpSessionId].mxpJoin(e)},"4_client":function(e){this.sinch.callClient&&this.sinch.callClient.callBuffert[e.mxpSessionId]&&this.sinch.callClient.callBuffert[e.mxpSessionId].mxpJoined(e)},"5_null":function(e){this.msgToMe(e)?this.sinch.callClient&&this.sinch.callClient.callBuffert[e.mxpSessionId]&&this.sinch.callClient.callBuffert[e.mxpSessionId].mxpHangup(e):this.sinch.log(new Notification(0,1,"Received HUNG_UP message not meant for this instance, nvps.to header set to foreign instance id",e))},"6_null":function(e){this.msgToMe(e)?this.sinch.callClient&&this.sinch.callClient.callBuffert[e.mxpSessionId]&&this.sinch.callClient.callBuffert[e.mxpSessionId].mxpDeny(e):this.sinch.callClient&&this.sinch.log(new Notification(0,1,"Received DENIED message not meant for this instance, nvps.to header set to foreign instance id",e))},"6_error/json":function(e){this.msgToMe(e)?this.sinch.callClient&&this.sinch.callClient.callBuffert[e.mxpSessionId]&&this.sinch.callClient.callBuffert[e.mxpSessionId].mxpDeny(e):this.sinch.callClient&&this.sinch.log(new Notification(0,1,"Received DENIED message not meant for this instance, nvps.to header set to foreign instance id",e))},"7_null":function(e){this.msgToMe(e)?this.sinch.callClient&&this.sinch.callClient.callBuffert[e.mxpSessionId]&&this.sinch.callClient.callBuffert[e.mxpSessionId].mxpCancel(e):this.sinch.log(new Notification(0,1,"Received CANCEL message not meant for this instance, nvps.to header set to foreign instance id",e))},"7_client":function(e){this.msgToMe(e)?this.sinch.callClient&&this.sinch.callClient.callBuffert[e.mxpSessionId]&&this.sinch.callClient.callBuffert[e.mxpSessionId].mxpCancel(e):this.sinch.log(new Notification(0,1,"Received CANCEL message not meant for this instance, nvps.to header set to foreign instance id",e))},"9_message":function(e){this.sinch.callClient&&this.sinch.callClient.callBuffert[e.mxpSessionId]&&this.sinch.callClient.callBuffert[e.mxpSessionId].mxpFail(e)},"9_error/json":function(e){this.sinch.callClient&&this.sinch.callClient.callBuffert[e.mxpSessionId]&&this.sinch.callClient.callBuffert[e.mxpSessionId].mxpFail(e)},"10_sdp":function(e){if(this.msgToMe(e)){var t=JSON.parse(e.decrypted.bd);"type"in t&&"offer"==t.type||"answer"==t.type?this.sinch.callClient&&this.sinch.callClient.callBuffert[e.mxpSessionId]&&this.sinch.callClient.callBuffert[e.mxpSessionId].mxpPeerEventSdp(e):this.sinch.callClient&&this.sinch.callClient.callBuffert[e.mxpSessionId]&&this.sinch.callClient.callBuffert[e.mxpSessionId].mxpInjectIce(e)}else this.sinch.log(new Notification(0,1,"Received SDP/CAND message not meant for this instance, nvps.to header set to foreign instance id",e))}},G=G||{};for(var V in F)G[V]=F[V];z.prototype.sendMessage=function(e){var t=e.getMXPMessageObj(),n=r.defer();return t.decrypted.md=1,t.decrypted.bt="msg",t.decrypted.bv=10,this.getTransport(t).then(this.sendMXP.bind(this)).then(function(e){G["1_msg"].call(this,e),this.sinch.log(new MXPLog("Message sent to all participants",e)),n.resolve(this.sinch.messageClient.messageBuffert[e.mxpSessionId])}.bind(this)).fail(function(e){n.reject(e)}).progress(function(e){n.notify(e)}.bind(this)),n.promise},z.prototype.sendMsgAck=function(e){var t=new H({mxpSessionId:e.mxpSessionId});t.decrypted.md=2,t.decrypted.bt=e.decrypted.bt,t.decrypted.bv=10,t.transportObj=e.transportObj;var n=[];t.transportObj.participants.forEach(function(t){t.channel==e.decrypted.fs&&n.push(t)}.bind(this)),t.transportObj.participants=n,Object.keys(t.transportObj.participants).length>0&&(this.sinch.log(new MXPLog("Will send Ack",t)),this.sendMXP(t).then(function(t){this.sinch.log(new MXPLog("Sent ack",[e.decrypted.fu,t.channel]))}.bind(this)).fail(function(e){console.error(e)}))};var J={none:function(e){console.log("Null handler for message object: ",e)},"1_msg":function(e){(function(){if(void 0===this.sinch.messageClient){var e=new MXPError(a.ErrorDomainCapability,c.CapabilityCapabilityMissing,"Can not process IM messages. Messaging capability not set.");this.sinch.log(e)}}).call(this),this.sinch.messageClient&&this.sinch.messageClient.handleMessage(e)&&e.decrypted.fu!=this.user.userId&&this.sendMsgAck(e)},"2_msg":function(e){this.sinch.messageClient&&this.sinch.messageClient.ackMsg(e.decrypted.fu,e.mxpSessionId)}};G=G||{};for(var V in J)G[V]=J[V];var W=W||function(e,t){var n={},i=n.lib={},r=function(){},s=i.Base={extend:function(e){r.prototype=this;var t=new r;return e&&t.mixIn(e),t.hasOwnProperty("init")||(t.init=function(){t.$super.init.apply(this,arguments)}),t.init.prototype=t,t.$super=this,t},create:function(){var e=this.extend();return e.init.apply(e,arguments),e},init:function(){},mixIn:function(e){for(var t in e)e.hasOwnProperty(t)&&(this[t]=e[t]);e.hasOwnProperty("toString")&&(this.toString=e.toString)},clone:function(){return this.init.prototype.extend(this)}},o=i.WordArray=s.extend({init:function(e,t){e=this.words=e||[],this.sigBytes=void 0!=t?t:4*e.length},toString:function(e){return(e||c).stringify(this)},concat:function(e){var t=this.words,n=e.words,i=this.sigBytes;if(e=e.sigBytes,this.clamp(),i%4)for(var r=0;r<e;r++)t[i+r>>>2]|=(n[r>>>2]>>>24-r%4*8&255)<<24-(i+r)%4*8;else if(65535<n.length)for(r=0;r<e;r+=4)t[i+r>>>2]=n[r>>>2];else t.push.apply(t,n);return this.sigBytes+=e,this},clamp:function(){var t=this.words,n=this.sigBytes;t[n>>>2]&=4294967295<<32-n%4*8,t.length=e.ceil(n/4)},clone:function(){var e=s.clone.call(this);return e.words=this.words.slice(0),e},random:function(t){for(var n=[],i=0;i<t;i+=4)n.push(4294967296*e.random()|0);return new o.init(n,t)}}),a=n.enc={},c=a.Hex={stringify:function(e){var t=e.words;e=e.sigBytes;for(var n=[],i=0;i<e;i++){var r=t[i>>>2]>>>24-i%4*8&255;n.push((r>>>4).toString(16)),n.push((15&r).toString(16))}return n.join("")},parse:function(e){for(var t=e.length,n=[],i=0;i<t;i+=2)n[i>>>3]|=parseInt(e.substr(i,2),16)<<24-i%8*4;return new o.init(n,t/2)}},u=a.Latin1={stringify:function(e){var t=e.words;e=e.sigBytes;for(var n=[],i=0;i<e;i++)n.push(String.fromCharCode(t[i>>>2]>>>24-i%4*8&255));return n.join("")},parse:function(e){for(var t=e.length,n=[],i=0;i<t;i++)n[i>>>2]|=(255&e.charCodeAt(i))<<24-i%4*8;return new o.init(n,t)}},h=a.Utf8={stringify:function(e){try{return decodeURIComponent(escape(u.stringify(e)))}catch(e){throw Error("Malformed UTF-8 data")}},parse:function(e){return u.parse(unescape(encodeURIComponent(e)))}},l=i.BufferedBlockAlgorithm=s.extend({reset:function(){this._data=new o.init,this._nDataBytes=0},_append:function(e){"string"==typeof e&&(e=h.parse(e)),this._data.concat(e),this._nDataBytes+=e.sigBytes},_process:function(t){var n=this._data,i=n.words,r=n.sigBytes,s=this.blockSize,a=r/(4*s);if(t=(a=t?e.ceil(a):e.max((0|a)-this._minBufferSize,0))*s,r=e.min(4*t,r),t){for(var c=0;c<t;c+=s)this._doProcessBlock(i,c);c=i.splice(0,t),n.sigBytes-=r}return new o.init(c,r)},clone:function(){var e=s.clone.call(this);return e._data=this._data.clone(),e},_minBufferSize:0});i.Hasher=l.extend({cfg:s.extend(),init:function(e){this.cfg=this.cfg.extend(e),this.reset()},reset:function(){l.reset.call(this),this._doReset()},update:function(e){return this._append(e),this._process(),this},finalize:function(e){return e&&this._append(e),this._doFinalize()},blockSize:16,_createHelper:function(e){return function(t,n){return new e.init(n).finalize(t)}},_createHmacHelper:function(e){return function(t,n){return new f.HMAC.init(e,n).finalize(t)}}});var f=n.algo={};return n}(Math);!function(e){function t(e,t,n,i,r,s,o){return((e=e+(t&n|~t&i)+r+o)<<s|e>>>32-s)+t}function n(e,t,n,i,r,s,o){return((e=e+(t&i|n&~i)+r+o)<<s|e>>>32-s)+t}function i(e,t,n,i,r,s,o){return((e=e+(t^n^i)+r+o)<<s|e>>>32-s)+t}function r(e,t,n,i,r,s,o){return((e=e+(n^(t|~i))+r+o)<<s|e>>>32-s)+t}for(var s=W,o=(c=s.lib).WordArray,a=c.Hasher,c=s.algo,u=[],h=0;64>h;h++)u[h]=4294967296*e.abs(e.sin(h+1))|0;c=c.MD5=a.extend({_doReset:function(){this._hash=new o.init([1732584193,4023233417,2562383102,271733878])},_doProcessBlock:function(e,s){for(var o=0;16>o;o++){var a=e[l=s+o];e[l]=16711935&(a<<8|a>>>24)|4278255360&(a<<24|a>>>8)}o=this._hash.words;var c,h,l=e[s+0],f=(a=e[s+1],e[s+2]),p=e[s+3],d=e[s+4],g=e[s+5],y=e[s+6],m=e[s+7],v=e[s+8],b=e[s+9],w=e[s+10],S=e[s+11],C=e[s+12],I=e[s+13],_=e[s+14],x=e[s+15],E=o[0],k=r(k=r(k=r(k=r(k=i(k=i(k=i(k=i(k=n(k=n(k=n(k=n(k=t(k=t(k=t(k=t(k=o[1],h=t(h=o[2],c=t(c=o[3],E=t(E,k,h,c,l,7,u[0]),k,h,a,12,u[1]),E,k,f,17,u[2]),c,E,p,22,u[3]),h=t(h,c=t(c,E=t(E,k,h,c,d,7,u[4]),k,h,g,12,u[5]),E,k,y,17,u[6]),c,E,m,22,u[7]),h=t(h,c=t(c,E=t(E,k,h,c,v,7,u[8]),k,h,b,12,u[9]),E,k,w,17,u[10]),c,E,S,22,u[11]),h=t(h,c=t(c,E=t(E,k,h,c,C,7,u[12]),k,h,I,12,u[13]),E,k,_,17,u[14]),c,E,x,22,u[15]),h=n(h,c=n(c,E=n(E,k,h,c,a,5,u[16]),k,h,y,9,u[17]),E,k,S,14,u[18]),c,E,l,20,u[19]),h=n(h,c=n(c,E=n(E,k,h,c,g,5,u[20]),k,h,w,9,u[21]),E,k,x,14,u[22]),c,E,d,20,u[23]),h=n(h,c=n(c,E=n(E,k,h,c,b,5,u[24]),k,h,_,9,u[25]),E,k,p,14,u[26]),c,E,v,20,u[27]),h=n(h,c=n(c,E=n(E,k,h,c,I,5,u[28]),k,h,f,9,u[29]),E,k,m,14,u[30]),c,E,C,20,u[31]),h=i(h,c=i(c,E=i(E,k,h,c,g,4,u[32]),k,h,v,11,u[33]),E,k,S,16,u[34]),c,E,_,23,u[35]),h=i(h,c=i(c,E=i(E,k,h,c,a,4,u[36]),k,h,d,11,u[37]),E,k,m,16,u[38]),c,E,w,23,u[39]),h=i(h,c=i(c,E=i(E,k,h,c,I,4,u[40]),k,h,l,11,u[41]),E,k,p,16,u[42]),c,E,y,23,u[43]),h=i(h,c=i(c,E=i(E,k,h,c,b,4,u[44]),k,h,C,11,u[45]),E,k,x,16,u[46]),c,E,f,23,u[47]),h=r(h,c=r(c,E=r(E,k,h,c,l,6,u[48]),k,h,m,10,u[49]),E,k,_,15,u[50]),c,E,g,21,u[51]),h=r(h,c=r(c,E=r(E,k,h,c,C,6,u[52]),k,h,p,10,u[53]),E,k,w,15,u[54]),c,E,a,21,u[55]),h=r(h,c=r(c,E=r(E,k,h,c,v,6,u[56]),k,h,x,10,u[57]),E,k,y,15,u[58]),c,E,I,21,u[59]),h=r(h,c=r(c,E=r(E,k,h,c,d,6,u[60]),k,h,S,10,u[61]),E,k,f,15,u[62]),c,E,b,21,u[63]);o[0]=o[0]+E|0,o[1]=o[1]+k|0,o[2]=o[2]+h|0,o[3]=o[3]+c|0},_doFinalize:function(){var t=this._data,n=t.words,i=8*this._nDataBytes,r=8*t.sigBytes;n[r>>>5]|=128<<24-r%32;var s=e.floor(i/4294967296);for(n[15+(r+64>>>9<<4)]=16711935&(s<<8|s>>>24)|4278255360&(s<<24|s>>>8),n[14+(r+64>>>9<<4)]=16711935&(i<<8|i>>>24)|4278255360&(i<<24|i>>>8),t.sigBytes=4*(n.length+1),this._process(),n=(t=this._hash).words,i=0;4>i;i++)r=n[i],n[i]=16711935&(r<<8|r>>>24)|4278255360&(r<<24|r>>>8);return t},clone:function(){var e=a.clone.call(this);return e._hash=this._hash.clone(),e}}),s.MD5=a._createHelper(c),s.HmacMD5=a._createHmacHelper(c)}(Math);var X,q,Q,Y;W=W||function(e,t){var n={},i=n.lib={},r=function(){},s=i.Base={extend:function(e){r.prototype=this;var t=new r;return e&&t.mixIn(e),t.hasOwnProperty("init")||(t.init=function(){t.$super.init.apply(this,arguments)}),t.init.prototype=t,t.$super=this,t},create:function(){var e=this.extend();return e.init.apply(e,arguments),e},init:function(){},mixIn:function(e){for(var t in e)e.hasOwnProperty(t)&&(this[t]=e[t]);e.hasOwnProperty("toString")&&(this.toString=e.toString)},clone:function(){return this.init.prototype.extend(this)}},o=i.WordArray=s.extend({init:function(e,t){e=this.words=e||[],this.sigBytes=void 0!=t?t:4*e.length},toString:function(e){return(e||c).stringify(this)},concat:function(e){var t=this.words,n=e.words,i=this.sigBytes;if(e=e.sigBytes,this.clamp(),i%4)for(var r=0;r<e;r++)t[i+r>>>2]|=(n[r>>>2]>>>24-r%4*8&255)<<24-(i+r)%4*8;else if(65535<n.length)for(r=0;r<e;r+=4)t[i+r>>>2]=n[r>>>2];else t.push.apply(t,n);return this.sigBytes+=e,this},clamp:function(){var t=this.words,n=this.sigBytes;t[n>>>2]&=4294967295<<32-n%4*8,t.length=e.ceil(n/4)},clone:function(){var e=s.clone.call(this);return e.words=this.words.slice(0),e},random:function(t){for(var n=[],i=0;i<t;i+=4)n.push(4294967296*e.random()|0);return new o.init(n,t)}}),a=n.enc={},c=a.Hex={stringify:function(e){var t=e.words;e=e.sigBytes;for(var n=[],i=0;i<e;i++){var r=t[i>>>2]>>>24-i%4*8&255;n.push((r>>>4).toString(16)),n.push((15&r).toString(16))}return n.join("")},parse:function(e){for(var t=e.length,n=[],i=0;i<t;i+=2)n[i>>>3]|=parseInt(e.substr(i,2),16)<<24-i%8*4;return new o.init(n,t/2)}},u=a.Latin1={stringify:function(e){var t=e.words;e=e.sigBytes;for(var n=[],i=0;i<e;i++)n.push(String.fromCharCode(t[i>>>2]>>>24-i%4*8&255));return n.join("")},parse:function(e){for(var t=e.length,n=[],i=0;i<t;i++)n[i>>>2]|=(255&e.charCodeAt(i))<<24-i%4*8;return new o.init(n,t)}},h=a.Utf8={stringify:function(e){try{return decodeURIComponent(escape(u.stringify(e)))}catch(e){throw Error("Malformed UTF-8 data")}},parse:function(e){return u.parse(unescape(encodeURIComponent(e)))}},l=i.BufferedBlockAlgorithm=s.extend({reset:function(){this._data=new o.init,this._nDataBytes=0},_append:function(e){"string"==typeof e&&(e=h.parse(e)),this._data.concat(e),this._nDataBytes+=e.sigBytes},_process:function(t){var n=this._data,i=n.words,r=n.sigBytes,s=this.blockSize,a=r/(4*s);if(t=(a=t?e.ceil(a):e.max((0|a)-this._minBufferSize,0))*s,r=e.min(4*t,r),t){for(var c=0;c<t;c+=s)this._doProcessBlock(i,c);c=i.splice(0,t),n.sigBytes-=r}return new o.init(c,r)},clone:function(){var e=s.clone.call(this);return e._data=this._data.clone(),e},_minBufferSize:0});i.Hasher=l.extend({cfg:s.extend(),init:function(e){this.cfg=this.cfg.extend(e),this.reset()},reset:function(){l.reset.call(this),this._doReset()},update:function(e){return this._append(e),this._process(),this},finalize:function(e){return e&&this._append(e),this._doFinalize()},blockSize:16,_createHelper:function(e){return function(t,n){return new e.init(n).finalize(t)}},_createHmacHelper:function(e){return function(t,n){return new f.HMAC.init(e,n).finalize(t)}}});var f=n.algo={};return n}(Math);!function(e){for(var t=W,n=(r=t.lib).WordArray,i=r.Hasher,r=t.algo,s=[],o=[],a=function(e){return 4294967296*(e-(0|e))|0},c=2,u=0;64>u;){var h;e:{h=c;for(var l=e.sqrt(h),f=2;f<=l;f++)if(!(h%f)){h=!1;break e}h=!0}h&&(8>u&&(s[u]=a(e.pow(c,.5))),o[u]=a(e.pow(c,1/3)),u++),c++}var p=[];r=r.SHA256=i.extend({_doReset:function(){this._hash=new n.init(s.slice(0))},_doProcessBlock:function(e,t){for(var n=this._hash.words,i=n[0],r=n[1],s=n[2],a=n[3],c=n[4],u=n[5],h=n[6],l=n[7],f=0;64>f;f++){if(16>f)p[f]=0|e[t+f];else{var d=p[f-15],g=p[f-2];p[f]=((d<<25|d>>>7)^(d<<14|d>>>18)^d>>>3)+p[f-7]+((g<<15|g>>>17)^(g<<13|g>>>19)^g>>>10)+p[f-16]}d=l+((c<<26|c>>>6)^(c<<21|c>>>11)^(c<<7|c>>>25))+(c&u^~c&h)+o[f]+p[f],g=((i<<30|i>>>2)^(i<<19|i>>>13)^(i<<10|i>>>22))+(i&r^i&s^r&s),l=h,h=u,u=c,c=a+d|0,a=s,s=r,r=i,i=d+g|0}n[0]=n[0]+i|0,n[1]=n[1]+r|0,n[2]=n[2]+s|0,n[3]=n[3]+a|0,n[4]=n[4]+c|0,n[5]=n[5]+u|0,n[6]=n[6]+h|0,n[7]=n[7]+l|0},_doFinalize:function(){var t=this._data,n=t.words,i=8*this._nDataBytes,r=8*t.sigBytes;return n[r>>>5]|=128<<24-r%32,n[14+(r+64>>>9<<4)]=e.floor(i/4294967296),n[15+(r+64>>>9<<4)]=i,t.sigBytes=4*n.length,this._process(),this._hash},clone:function(){var e=i.clone.call(this);return e._hash=this._hash.clone(),e}});t.SHA256=i._createHelper(r),t.HmacSHA256=i._createHmacHelper(r)}(Math),q=(X=W).enc.Utf8,X.algo.HMAC=X.lib.Base.extend({init:function(e,t){e=this._hasher=new e.init,"string"==typeof t&&(t=q.parse(t));var n=e.blockSize,i=4*n;t.sigBytes>i&&(t=e.finalize(t)),t.clamp();for(var r=this._oKey=t.clone(),s=this._iKey=t.clone(),o=r.words,a=s.words,c=0;c<n;c++)o[c]^=1549556828,a[c]^=909522486;r.sigBytes=s.sigBytes=i,this.reset()},reset:function(){var e=this._hasher;e.reset(),e.update(this._iKey)},update:function(e){return this._hasher.update(e),this},finalize:function(e){var t=this._hasher;return e=t.finalize(e),t.reset(),t.finalize(this._oKey.clone().concat(e))}}),Y=(Q=W).lib.WordArray,Q.enc.Base64={stringify:function(e){var t=e.words,n=e.sigBytes,i=this._map;e.clamp(),e=[];for(var r=0;r<n;r+=3)for(var s=(t[r>>>2]>>>24-r%4*8&255)<<16|(t[r+1>>>2]>>>24-(r+1)%4*8&255)<<8|t[r+2>>>2]>>>24-(r+2)%4*8&255,o=0;4>o&&r+.75*o<n;o++)e.push(i.charAt(s>>>6*(3-o)&63));if(t=i.charAt(64))for(;e.length%4;)e.push(t);return e.join("")},parse:function(e){var t=e.length,n=this._map;(i=n.charAt(64))&&-1!=(i=e.indexOf(i))&&(t=i);for(var i=[],r=0,s=0;s<t;s++)if(s%4){var o=n.indexOf(e.charAt(s-1))<<s%4*2,a=n.indexOf(e.charAt(s))>>>6-s%4*2;i[r>>>2]|=(o|a)<<24-r%4*8,r++}return Y.create(i,r)},_map:"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="};var $,Z,ee,te,ne,ie,re;W=W||function(e,t){var n={},i=n.lib={},r=function(){},s=i.Base={extend:function(e){r.prototype=this;var t=new r;return e&&t.mixIn(e),t.hasOwnProperty("init")||(t.init=function(){t.$super.init.apply(this,arguments)}),t.init.prototype=t,t.$super=this,t},create:function(){var e=this.extend();return e.init.apply(e,arguments),e},init:function(){},mixIn:function(e){for(var t in e)e.hasOwnProperty(t)&&(this[t]=e[t]);e.hasOwnProperty("toString")&&(this.toString=e.toString)},clone:function(){return this.init.prototype.extend(this)}},o=i.WordArray=s.extend({init:function(e,t){e=this.words=e||[],this.sigBytes=void 0!=t?t:4*e.length},toString:function(e){return(e||c).stringify(this)},concat:function(e){var t=this.words,n=e.words,i=this.sigBytes;if(e=e.sigBytes,this.clamp(),i%4)for(var r=0;r<e;r++)t[i+r>>>2]|=(n[r>>>2]>>>24-r%4*8&255)<<24-(i+r)%4*8;else if(65535<n.length)for(r=0;r<e;r+=4)t[i+r>>>2]=n[r>>>2];else t.push.apply(t,n);return this.sigBytes+=e,this},clamp:function(){var t=this.words,n=this.sigBytes;t[n>>>2]&=4294967295<<32-n%4*8,t.length=e.ceil(n/4)},clone:function(){var e=s.clone.call(this);return e.words=this.words.slice(0),e},random:function(t){for(var n=[],i=0;i<t;i+=4)n.push(4294967296*e.random()|0);return new o.init(n,t)}}),a=n.enc={},c=a.Hex={stringify:function(e){var t=e.words;e=e.sigBytes;for(var n=[],i=0;i<e;i++){var r=t[i>>>2]>>>24-i%4*8&255;n.push((r>>>4).toString(16)),n.push((15&r).toString(16))}return n.join("")},parse:function(e){for(var t=e.length,n=[],i=0;i<t;i+=2)n[i>>>3]|=parseInt(e.substr(i,2),16)<<24-i%8*4;return new o.init(n,t/2)}},u=a.Latin1={stringify:function(e){var t=e.words;e=e.sigBytes;for(var n=[],i=0;i<e;i++)n.push(String.fromCharCode(t[i>>>2]>>>24-i%4*8&255));return n.join("")},parse:function(e){for(var t=e.length,n=[],i=0;i<t;i++)n[i>>>2]|=(255&e.charCodeAt(i))<<24-i%4*8;return new o.init(n,t)}},h=a.Utf8={stringify:function(e){try{return decodeURIComponent(escape(u.stringify(e)))}catch(e){throw Error("Malformed UTF-8 data")}},parse:function(e){return u.parse(unescape(encodeURIComponent(e)))}},l=i.BufferedBlockAlgorithm=s.extend({reset:function(){this._data=new o.init,this._nDataBytes=0},_append:function(e){"string"==typeof e&&(e=h.parse(e)),this._data.concat(e),this._nDataBytes+=e.sigBytes},_process:function(t){var n=this._data,i=n.words,r=n.sigBytes,s=this.blockSize,a=r/(4*s);if(t=(a=t?e.ceil(a):e.max((0|a)-this._minBufferSize,0))*s,r=e.min(4*t,r),t){for(var c=0;c<t;c+=s)this._doProcessBlock(i,c);c=i.splice(0,t),n.sigBytes-=r}return new o.init(c,r)},clone:function(){var e=s.clone.call(this);return e._data=this._data.clone(),e},_minBufferSize:0});i.Hasher=l.extend({cfg:s.extend(),init:function(e){this.cfg=this.cfg.extend(e),this.reset()},reset:function(){l.reset.call(this),this._doReset()},update:function(e){return this._append(e),this._process(),this},finalize:function(e){return e&&this._append(e),this._doFinalize()},blockSize:16,_createHelper:function(e){return function(t,n){return new e.init(n).finalize(t)}},_createHmacHelper:function(e){return function(t,n){return new f.HMAC.init(e,n).finalize(t)}}});var f=n.algo={};return n}(Math);Z=($=W).lib.WordArray,$.enc.Base64={stringify:function(e){var t=e.words,n=e.sigBytes,i=this._map;e.clamp(),e=[];for(var r=0;r<n;r+=3)for(var s=(t[r>>>2]>>>24-r%4*8&255)<<16|(t[r+1>>>2]>>>24-(r+1)%4*8&255)<<8|t[r+2>>>2]>>>24-(r+2)%4*8&255,o=0;4>o&&r+.75*o<n;o++)e.push(i.charAt(s>>>6*(3-o)&63));if(t=i.charAt(64))for(;e.length%4;)e.push(t);return e.join("")},parse:function(e){var t=e.length,n=this._map;(i=n.charAt(64))&&-1!=(i=e.indexOf(i))&&(t=i);for(var i=[],r=0,s=0;s<t;s++)if(s%4){var o=n.indexOf(e.charAt(s-1))<<s%4*2,a=n.indexOf(e.charAt(s))>>>6-s%4*2;i[r>>>2]|=(o|a)<<24-r%4*8,r++}return Z.create(i,r)},_map:"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="},function(e){function t(e,t,n,i,r,s,o){return((e=e+(t&n|~t&i)+r+o)<<s|e>>>32-s)+t}function n(e,t,n,i,r,s,o){return((e=e+(t&i|n&~i)+r+o)<<s|e>>>32-s)+t}function i(e,t,n,i,r,s,o){return((e=e+(t^n^i)+r+o)<<s|e>>>32-s)+t}function r(e,t,n,i,r,s,o){return((e=e+(n^(t|~i))+r+o)<<s|e>>>32-s)+t}for(var s=W,o=(c=s.lib).WordArray,a=c.Hasher,c=s.algo,u=[],h=0;64>h;h++)u[h]=4294967296*e.abs(e.sin(h+1))|0;c=c.MD5=a.extend({_doReset:function(){this._hash=new o.init([1732584193,4023233417,2562383102,271733878])},_doProcessBlock:function(e,s){for(var o=0;16>o;o++){var a=e[l=s+o];e[l]=16711935&(a<<8|a>>>24)|4278255360&(a<<24|a>>>8)}o=this._hash.words;var c,h,l=e[s+0],f=(a=e[s+1],e[s+2]),p=e[s+3],d=e[s+4],g=e[s+5],y=e[s+6],m=e[s+7],v=e[s+8],b=e[s+9],w=e[s+10],S=e[s+11],C=e[s+12],I=e[s+13],_=e[s+14],x=e[s+15],E=o[0],k=r(k=r(k=r(k=r(k=i(k=i(k=i(k=i(k=n(k=n(k=n(k=n(k=t(k=t(k=t(k=t(k=o[1],h=t(h=o[2],c=t(c=o[3],E=t(E,k,h,c,l,7,u[0]),k,h,a,12,u[1]),E,k,f,17,u[2]),c,E,p,22,u[3]),h=t(h,c=t(c,E=t(E,k,h,c,d,7,u[4]),k,h,g,12,u[5]),E,k,y,17,u[6]),c,E,m,22,u[7]),h=t(h,c=t(c,E=t(E,k,h,c,v,7,u[8]),k,h,b,12,u[9]),E,k,w,17,u[10]),c,E,S,22,u[11]),h=t(h,c=t(c,E=t(E,k,h,c,C,7,u[12]),k,h,I,12,u[13]),E,k,_,17,u[14]),c,E,x,22,u[15]),h=n(h,c=n(c,E=n(E,k,h,c,a,5,u[16]),k,h,y,9,u[17]),E,k,S,14,u[18]),c,E,l,20,u[19]),h=n(h,c=n(c,E=n(E,k,h,c,g,5,u[20]),k,h,w,9,u[21]),E,k,x,14,u[22]),c,E,d,20,u[23]),h=n(h,c=n(c,E=n(E,k,h,c,b,5,u[24]),k,h,_,9,u[25]),E,k,p,14,u[26]),c,E,v,20,u[27]),h=n(h,c=n(c,E=n(E,k,h,c,I,5,u[28]),k,h,f,9,u[29]),E,k,m,14,u[30]),c,E,C,20,u[31]),h=i(h,c=i(c,E=i(E,k,h,c,g,4,u[32]),k,h,v,11,u[33]),E,k,S,16,u[34]),c,E,_,23,u[35]),h=i(h,c=i(c,E=i(E,k,h,c,a,4,u[36]),k,h,d,11,u[37]),E,k,m,16,u[38]),c,E,w,23,u[39]),h=i(h,c=i(c,E=i(E,k,h,c,I,4,u[40]),k,h,l,11,u[41]),E,k,p,16,u[42]),c,E,y,23,u[43]),h=i(h,c=i(c,E=i(E,k,h,c,b,4,u[44]),k,h,C,11,u[45]),E,k,x,16,u[46]),c,E,f,23,u[47]),h=r(h,c=r(c,E=r(E,k,h,c,l,6,u[48]),k,h,m,10,u[49]),E,k,_,15,u[50]),c,E,g,21,u[51]),h=r(h,c=r(c,E=r(E,k,h,c,C,6,u[52]),k,h,p,10,u[53]),E,k,w,15,u[54]),c,E,a,21,u[55]),h=r(h,c=r(c,E=r(E,k,h,c,v,6,u[56]),k,h,x,10,u[57]),E,k,y,15,u[58]),c,E,I,21,u[59]),h=r(h,c=r(c,E=r(E,k,h,c,d,6,u[60]),k,h,S,10,u[61]),E,k,f,15,u[62]),c,E,b,21,u[63]);o[0]=o[0]+E|0,o[1]=o[1]+k|0,o[2]=o[2]+h|0,o[3]=o[3]+c|0},_doFinalize:function(){var t=this._data,n=t.words,i=8*this._nDataBytes,r=8*t.sigBytes;n[r>>>5]|=128<<24-r%32;var s=e.floor(i/4294967296);for(n[15+(r+64>>>9<<4)]=16711935&(s<<8|s>>>24)|4278255360&(s<<24|s>>>8),n[14+(r+64>>>9<<4)]=16711935&(i<<8|i>>>24)|4278255360&(i<<24|i>>>8),t.sigBytes=4*(n.length+1),this._process(),n=(t=this._hash).words,i=0;4>i;i++)r=n[i],n[i]=16711935&(r<<8|r>>>24)|4278255360&(r<<24|r>>>8);return t},clone:function(){var e=a.clone.call(this);return e._hash=this._hash.clone(),e}}),s.MD5=a._createHelper(c),s.HmacMD5=a._createHmacHelper(c)}(Math),ne=(ee=(te=W).lib).Base,ie=ee.WordArray,re=(ee=te.algo).EvpKDF=ne.extend({cfg:ne.extend({keySize:4,hasher:ee.MD5,iterations:1}),init:function(e){this.cfg=this.cfg.extend(e)},compute:function(e,t){for(var n=(o=this.cfg).hasher.create(),i=ie.create(),r=i.words,s=o.keySize,o=o.iterations;r.length<s;){a&&n.update(a);var a=n.update(e).finalize(t);n.reset();for(var c=1;c<o;c++)a=n.finalize(a),n.reset();i.concat(a)}return i.sigBytes=4*s,i}}),te.EvpKDF=function(e,t,n){return re.create(n).compute(e,t)},W.lib.Cipher||function(e){var t=(p=W).lib,n=t.Base,i=t.WordArray,r=t.BufferedBlockAlgorithm,s=p.enc.Base64,o=p.algo.EvpKDF,a=t.Cipher=r.extend({cfg:n.extend(),createEncryptor:function(e,t){return this.create(this._ENC_XFORM_MODE,e,t)},createDecryptor:function(e,t){return this.create(this._DEC_XFORM_MODE,e,t)},init:function(e,t,n){this.cfg=this.cfg.extend(n),this._xformMode=e,this._key=t,this.reset()},reset:function(){r.reset.call(this),this._doReset()},process:function(e){return this._append(e),this._process()},finalize:function(e){return e&&this._append(e),this._doFinalize()},keySize:4,ivSize:4,_ENC_XFORM_MODE:1,_DEC_XFORM_MODE:2,_createHelper:function(e){return{encrypt:function(t,n,i){return("string"==typeof n?d:f).encrypt(e,t,n,i)},decrypt:function(t,n,i){return("string"==typeof n?d:f).decrypt(e,t,n,i)}}}});t.StreamCipher=a.extend({_doFinalize:function(){return this._process(!0)},blockSize:1});var c=p.mode={},u=function(e,t,n){var i=this._iv;i?this._iv=void 0:i=this._prevBlock;for(var r=0;r<n;r++)e[t+r]^=i[r]},h=(t.BlockCipherMode=n.extend({createEncryptor:function(e,t){return this.Encryptor.create(e,t)},createDecryptor:function(e,t){return this.Decryptor.create(e,t)},init:function(e,t){this._cipher=e,this._iv=t}})).extend();h.Encryptor=h.extend({processBlock:function(e,t){var n=this._cipher,i=n.blockSize;u.call(this,e,t,i),n.encryptBlock(e,t),this._prevBlock=e.slice(t,t+i)}}),h.Decryptor=h.extend({processBlock:function(e,t){var n=this._cipher,i=n.blockSize,r=e.slice(t,t+i);n.decryptBlock(e,t),u.call(this,e,t,i),this._prevBlock=r}}),c=c.CBC=h,h=(p.pad={}).Pkcs7={pad:function(e,t){for(var n,r=(n=(n=4*t)-e.sigBytes%n)<<24|n<<16|n<<8|n,s=[],o=0;o<n;o+=4)s.push(r);n=i.create(s,n),e.concat(n)},unpad:function(e){e.sigBytes-=255&e.words[e.sigBytes-1>>>2]}},t.BlockCipher=a.extend({cfg:a.cfg.extend({mode:c,padding:h}),reset:function(){a.reset.call(this);var e=(t=this.cfg).iv,t=t.mode;if(this._xformMode==this._ENC_XFORM_MODE)var n=t.createEncryptor;else n=t.createDecryptor,this._minBufferSize=1;this._mode=n.call(t,this,e&&e.words)},_doProcessBlock:function(e,t){this._mode.processBlock(e,t)},_doFinalize:function(){var e=this.cfg.padding;if(this._xformMode==this._ENC_XFORM_MODE){e.pad(this._data,this.blockSize);var t=this._process(!0)}else t=this._process(!0),e.unpad(t);return t},blockSize:4});var l=t.CipherParams=n.extend({init:function(e){this.mixIn(e)},toString:function(e){return(e||this.formatter).stringify(this)}}),f=(c=(p.format={}).OpenSSL={stringify:function(e){var t=e.ciphertext;return((e=e.salt)?i.create([1398893684,1701076831]).concat(e).concat(t):t).toString(s)},parse:function(e){var t=(e=s.parse(e)).words;if(1398893684==t[0]&&1701076831==t[1]){var n=i.create(t.slice(2,4));t.splice(0,4),e.sigBytes-=16}return l.create({ciphertext:e,salt:n})}},t.SerializableCipher=n.extend({cfg:n.extend({format:c}),encrypt:function(e,t,n,i){i=this.cfg.extend(i);var r=e.createEncryptor(n,i);return t=r.finalize(t),r=r.cfg,l.create({ciphertext:t,key:n,iv:r.iv,algorithm:e,mode:r.mode,padding:r.padding,blockSize:e.blockSize,formatter:i.format})},decrypt:function(e,t,n,i){return i=this.cfg.extend(i),t=this._parse(t,i.format),e.createDecryptor(n,i).finalize(t.ciphertext)},_parse:function(e,t){return"string"==typeof e?t.parse(e,this):e}})),p=(p.kdf={}).OpenSSL={execute:function(e,t,n,r){return r||(r=i.random(8)),e=o.create({keySize:t+n}).compute(e,r),n=i.create(e.words.slice(t),4*n),e.sigBytes=4*t,l.create({key:e,iv:n,salt:r})}},d=t.PasswordBasedCipher=f.extend({cfg:f.cfg.extend({kdf:p}),encrypt:function(e,t,n,i){return n=(i=this.cfg.extend(i)).kdf.execute(n,e.keySize,e.ivSize),i.iv=n.iv,(e=f.encrypt.call(this,e,t,n.key,i)).mixIn(n),e},decrypt:function(e,t,n,i){return i=this.cfg.extend(i),t=this._parse(t,i.format),n=i.kdf.execute(n,e.keySize,e.ivSize,t.salt),i.iv=n.iv,f.decrypt.call(this,e,t,n.key,i)}})}(),function(){for(var e=W,t=e.lib.BlockCipher,n=e.algo,i=[],r=[],s=[],o=[],a=[],c=[],u=[],h=[],l=[],f=[],p=[],d=0;256>d;d++)p[d]=128>d?d<<1:d<<1^283;var g=0,y=0;for(d=0;256>d;d++){var m=(m=y^y<<1^y<<2^y<<3^y<<4)>>>8^255&m^99;i[g]=m,r[m]=g;var v=p[g],b=p[v],w=p[b],S=257*p[m]^16843008*m;s[g]=S<<24|S>>>8,o[g]=S<<16|S>>>16,a[g]=S<<8|S>>>24,c[g]=S,S=16843009*w^65537*b^257*v^16843008*g,u[m]=S<<24|S>>>8,h[m]=S<<16|S>>>16,l[m]=S<<8|S>>>24,f[m]=S,g?(g=v^p[p[p[w^v]]],y^=p[p[y]]):g=y=1}var C=[0,1,2,4,8,16,32,64,128,27,54];n=n.AES=t.extend({_doReset:function(){for(var e=(n=this._key).words,t=n.sigBytes/4,n=4*((this._nRounds=t+6)+1),r=this._keySchedule=[],s=0;s<n;s++)if(s<t)r[s]=e[s];else{var o=r[s-1];s%t?6<t&&4==s%t&&(o=i[o>>>24]<<24|i[o>>>16&255]<<16|i[o>>>8&255]<<8|i[255&o]):(o=i[(o=o<<8|o>>>24)>>>24]<<24|i[o>>>16&255]<<16|i[o>>>8&255]<<8|i[255&o],o^=C[s/t|0]<<24),r[s]=r[s-t]^o}for(e=this._invKeySchedule=[],t=0;t<n;t++)s=n-t,o=t%4?r[s]:r[s-4],e[t]=4>t||4>=s?o:u[i[o>>>24]]^h[i[o>>>16&255]]^l[i[o>>>8&255]]^f[i[255&o]]},encryptBlock:function(e,t){this._doCryptBlock(e,t,this._keySchedule,s,o,a,c,i)},decryptBlock:function(e,t){var n=e[t+1];e[t+1]=e[t+3],e[t+3]=n,this._doCryptBlock(e,t,this._invKeySchedule,u,h,l,f,r),n=e[t+1],e[t+1]=e[t+3],e[t+3]=n},_doCryptBlock:function(e,t,n,i,r,s,o,a){for(var c=this._nRounds,u=e[t]^n[0],h=e[t+1]^n[1],l=e[t+2]^n[2],f=e[t+3]^n[3],p=4,d=1;d<c;d++){var g=i[u>>>24]^r[h>>>16&255]^s[l>>>8&255]^o[255&f]^n[p++],y=i[h>>>24]^r[l>>>16&255]^s[f>>>8&255]^o[255&u]^n[p++],m=i[l>>>24]^r[f>>>16&255]^s[u>>>8&255]^o[255&h]^n[p++];f=i[f>>>24]^r[u>>>16&255]^s[h>>>8&255]^o[255&l]^n[p++],u=g,h=y,l=m}g=(a[u>>>24]<<24|a[h>>>16&255]<<16|a[l>>>8&255]<<8|a[255&f])^n[p++],y=(a[h>>>24]<<24|a[l>>>16&255]<<16|a[f>>>8&255]<<8|a[255&u])^n[p++],m=(a[l>>>24]<<24|a[f>>>16&255]<<16|a[u>>>8&255]<<8|a[255&h])^n[p++],f=(a[f>>>24]<<24|a[u>>>16&255]<<16|a[h>>>8&255]<<8|a[255&l])^n[p++],e[t]=g,e[t+1]=y,e[t+2]=m,e[t+3]=f},keySize:8});e.AES=t._createHelper(n)}(),t.exports=p,t.exports.MessageClient=T,t.exports.Message=O,t.exports.Call=g,t.exports.CallClient=m,t.exports.Verification=j,t.exports.CallDetails=y,t.exports.MessageDeliveryInfo=B,t.exports.PAPIDefs=i},{"../VERSION":1,q:13,"sinch-ticketgen":14}]},{},[16])(16)});
+}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {},require("timers").setImmediate)
+},{"timers":2}],6:[function(require,module,exports){
+$("document").ready(function () {
+    sinchClient = new SinchClient({
+        applicationKey: "d7b1cd8e-1b44-42c4-9240-c6815e3d5e92",
+        capabilities: { calling: true, video: false },
+        supportActiveConnection: true,
+        onLogMessage: function (message) {
+            console.log(message.message);
+        },
+    });
+
+    var callClient;
+    var call;
+
+    // $("#signup").on("click", function (event) {
+    //     event.preventDefault();
+
+    //     var signUpObj = {};
+    //     signUpObj.username = $("input#username").val();
+    //     signUpObj.password = $("input#password").val();
+
+    //     sinchClient.newUser(signUpObj, function (ticket) {
+    //         sinchClient.start(ticket, afterStartSinchClient());
+    //     });
+    // });
+
+    $("#videocall").on("click", function (event) {
+        event.preventDefault();
+        $.ajax({
+            url: '../controllers/videocontroller.php',
+            type: 'POST',
+            datatype: 'JSON',
+            success: function (data) {
+                var data = JSON.parse(data);
+                for (var i = 0; i < (data.length); i++) {
+                    var signUpObj = {};
+                    signUpObj.userid = data[i].userId;
+                    signUpObj.firstname = data[i].firstname;
+                    signUpObj.lastname = data[i].lastname;
+                    signUpObj.password = data[i].password;
+                    sinchClient.newUser(signUpObj, function (ticket) {
+                        sinchClient.start(ticket, afterStartSinchClient());
+                    });
+                }
+                location.href = "../view/videocall.php";
+            }
+        });
+    });
+
+    $(".call").on("click", function (event) {
+        event.preventDefault();
+
+        var loggeduserid = $(this).siblings("input[name='loggeduserid']").val();
+        var userid = $(this).siblings("input[name='userid']").val();
+        var loggedfirstname = $(this).siblings("input[name='loggedfirstname']").val();
+        var firstname = $(this).siblings("input[name='firstname']").val();
+        var loggedlastname = $(this).siblings("input[name='loggedlastname']").val();
+        var lastname = $(this).siblings("input[name='lastname']").val();
+        var loggedpassword = $(this).siblings("input[name='loggedpassword']").val();
+        var password = $(this).siblings("input[name='password']").val();
+        console.log(loggeduserid, userid, loggedfirstname, firstname, loggedlastname, lastname);
+
+        var signUpObj1 = {};
+        var signUpObj2 = {};
+        signUpObj1.loggeduserid = loggeduserid;
+        signUpObj2.userid = userid;
+        signUpObj1.loggedfirstname = loggedfirstname;
+        signUpObj2.firstname = firstname;
+        signUpObj1.loggedlastname = loggedlastname;
+        signUpObj2.lastname = lastname;
+        signUpObj1.loggedpassword = loggedpassword;
+        signUpObj2.password = password;
+
+        sinchClient.newUser(signUpObj1, function (ticket) {
+            sinchClient.start(ticket, afterStartSinchClient());
+        });
+
+        sinchClient.newUser(signUpObj2, function (ticket) {
+            sinchClient.start(ticket, afterStartSinchClient());
+        });
+
+        // sinchClient.start(signUpObj1, afterStartSinchClient());
+        // sinchClient.start(signUpObj2, afterStartSinchClient());
+
+        if (!call) {
+            usernameToCall = firstname + ' ' + lastname;
+            //change the value of the status label
+            $("div#status").append("<div>Calling " + usernameToCall + " <img src='../assets/images/gif/videocall-loader.gif'></div>");
+            //change the call variable to the new call
+            call = callClient.callUser(usernameToCall);
+            //monitor the status of the call through callListeners
+            call.addEventListener(callListeners);
+        }
+    });
+
+    function afterStartSinchClient() {
+        // hide auth form
+        $("form#authForm").css("display", "none");
+        // show logged-in view
+        $("div#sinch").css("display", "inline");
+        // start listening for incoming calls
+        sinchClient.startActiveConnection();
+        // define call client (to handle incoming/outgoing calls)
+        callClient = sinchClient.getCallClient();
+        //initialize media streams, asks for microphone & video permission
+        callClient.initStream();
+        //what to do when there is an incoming call
+        callClient.addEventListener(incomingCallListener);
+    }
+
+    var incomingCallListener = {
+        onIncomingCall: function (incomingCall) {
+            //Change the view to display an incoming call
+            $("div#mystatus").append("<div>Incoming Call <img src='../assets/images/gif/videocall-loader.gif'></div>");
+            //assign the call variable to the incoming call
+            call = incomingCall;
+            //Use the addEventListener method on the call object to make sure we are updated of any changes to the call's status
+            call.addEventListener(callListeners);
+        }
+    }
+
+    var callListeners = {
+        //call is "ringing"
+        onCallProgressing: function (call) {
+            $("div#status").append("<div>Ringing</div>");
+        },
+        //they picked up the call!
+        onCallEstablished: function (call) {
+            $("div#mystatus").append("<div>Call established</div>");
+            $("div#status").append("<div>Call established</div>");
+            $("video#incoming").attr("src", call.outgoingStreamURL);
+            $("video#incoming").attr("src", call.incomingStreamURL);
+        },
+        //ended by either party
+        onCallEnded: function (call) {
+            $("div#status").append("<div>Call ended</div>");
+            $("div#mystatus").append("<div>Call ended</div>");
+            $("video#incoming").attr("src", "");
+            $("video#incoming").attr("src", "");
+            call = null;
+        }
+    }
+
+    // $("#login").on("click", function (event) {
+    //     event.preventDefault();
+
+    //     var signUpObj = {};
+    //     signUpObj.username = $("input#username").val();
+    //     signUpObj.password = $("input#password").val();
+
+    //     sinchClient.start(signUpObj, afterStartSinchClient());
+    // });
+
+    //When the call button is clicked, gether the username to call
+    // $(".call").on("click", function (event) {
+    //     event.preventDefault();
+
+    //     var signUpObj = {};
+    //     signUpObj.userid = data.userId;
+    //     signUpObj.firstname = data.firstname;
+    //     signUpObj.lastname = data.lastname;
+    //     signUpObj.password = data.password;
+
+    //     sinchClient.start(signUpObj, afterStartSinchClient());
+    //     //if there isn't a current call
+    //     if (!call) {
+    //         usernameToCall = data.firstname + ' ' + data.lastname;
+    //         //change the value of the status label
+    //         $("div#status").append("<div>Calling " + usernameToCall + "</div>");
+    //         //change the call variable to the new call
+    //         call = callClient.callUser(usernameToCall);
+    //         //monitor the status of the call through callListeners
+    //         call.addEventListener(callListeners);
+    //     }
+    // });
+
+
+
+    //Ansering a cal
+    $("#answer").click(function (event) {
+        event.preventDefault();
+        //make sure a call exists before attempting to answer
+        if (call) {
+            $("div#mystatus").append("<div>You answered the call<img src='../assets/images/gif/videocall-loader.gif'></div>");
+            call.answer();
+        }
+    });
+
+    //Hangup
+    $("#hangup").click(function (event) {
+        event.preventDefault();
+        //Make sure there is a current call to hangup
+        if (call) {
+            $("div#mystatus").append("<div>You hung up the call</div>");
+            //Simply call the hangup() method on the call variable
+            call.hangup();
+            //set the call variable to null and then you are ready to call again!
+            call = null
+        }
+    });
+});
+
+
+
+
+},{}],7:[function(require,module,exports){
 (function (global){
 window.jQuery = require('jquery');
 window.$  = global.jQuery;
 var script = require('./assets/js/script');
+var sinch = require('./assets/js/sinch.min');
+var sinchindex = require('./assets/js/sinchindex');
 var bootstrap = require('bootstrap');
 var spinner = require('./assets/js/button-inline-loader');
-
+var moment = require('moment-timezone');
+moment().tz("Africa/Lagos").format();
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./assets/js/button-inline-loader":1,"./assets/js/script":2,"bootstrap":4,"jquery":5}],4:[function(require,module,exports){
+},{"./assets/js/button-inline-loader":3,"./assets/js/script":4,"./assets/js/sinch.min":5,"./assets/js/sinchindex":6,"bootstrap":8,"jquery":9,"moment-timezone":11}],8:[function(require,module,exports){
 /*!
   * Bootstrap v4.5.0 (https://getbootstrap.com/)
   * Copyright 2011-2020 The Bootstrap Authors (https://github.com/twbs/bootstrap/graphs/contributors)
@@ -4790,7 +5572,7 @@ var spinner = require('./assets/js/button-inline-loader');
 })));
 
 
-},{"jquery":5,"popper.js":6}],5:[function(require,module,exports){
+},{"jquery":9,"popper.js":14}],9:[function(require,module,exports){
 /*!
  * jQuery JavaScript Library v3.5.1
  * https://jquery.com/
@@ -15664,7 +16446,7232 @@ if ( typeof noGlobal === "undefined" ) {
 return jQuery;
 } );
 
-},{}],6:[function(require,module,exports){
+},{}],10:[function(require,module,exports){
+module.exports={
+	"version": "2020a",
+	"zones": [
+		"Africa/Abidjan|LMT GMT|g.8 0|01|-2ldXH.Q|48e5",
+		"Africa/Accra|LMT GMT +0020|.Q 0 -k|012121212121212121212121212121212121212121212121|-26BbX.8 6tzX.8 MnE 1BAk MnE 1BAk MnE 1BAk MnE 1C0k MnE 1BAk MnE 1BAk MnE 1BAk MnE 1C0k MnE 1BAk MnE 1BAk MnE 1BAk MnE 1C0k MnE 1BAk MnE 1BAk MnE 1BAk MnE 1C0k MnE 1BAk MnE 1BAk MnE 1BAk MnE 1C0k MnE 1BAk MnE 1BAk MnE|41e5",
+		"Africa/Nairobi|LMT EAT +0230 +0245|-2r.g -30 -2u -2J|01231|-1F3Cr.g 3Dzr.g okMu MFXJ|47e5",
+		"Africa/Algiers|PMT WET WEST CET CEST|-9.l 0 -10 -10 -20|0121212121212121343431312123431213|-2nco9.l cNb9.l HA0 19A0 1iM0 11c0 1oo0 Wo0 1rc0 QM0 1EM0 UM0 DA0 Imo0 rd0 De0 9Xz0 1fb0 1ap0 16K0 2yo0 mEp0 hwL0 jxA0 11A0 dDd0 17b0 11B0 1cN0 2Dy0 1cN0 1fB0 1cL0|26e5",
+		"Africa/Lagos|LMT WAT|-d.A -10|01|-22y0d.A|17e6",
+		"Africa/Bissau|LMT -01 GMT|12.k 10 0|012|-2ldX0 2xoo0|39e4",
+		"Africa/Maputo|LMT CAT|-2a.k -20|01|-2GJea.k|26e5",
+		"Africa/Cairo|EET EEST|-20 -30|0101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010|-1bIO0 vb0 1ip0 11z0 1iN0 1nz0 12p0 1pz0 10N0 1pz0 16p0 1jz0 s3d0 Vz0 1oN0 11b0 1oO0 10N0 1pz0 10N0 1pb0 10N0 1pb0 10N0 1pb0 10N0 1pz0 10N0 1pb0 10N0 1pb0 11d0 1oL0 11d0 1pb0 11d0 1oL0 11d0 1oL0 11d0 1oL0 11d0 1pb0 11d0 1oL0 11d0 1oL0 11d0 1oL0 11d0 1pb0 11d0 1oL0 11d0 1oL0 11d0 1oL0 11d0 1pb0 11d0 1oL0 11d0 1WL0 rd0 1Rz0 wp0 1pb0 11d0 1oL0 11d0 1oL0 11d0 1oL0 11d0 1pb0 11d0 1qL0 Xd0 1oL0 11d0 1oL0 11d0 1pb0 11d0 1oL0 11d0 1oL0 11d0 1ny0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1qN0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1qN0 11z0 1o10 11z0 1o10 WL0 1qN0 Rb0 1wp0 On0 1zd0 Lz0 1EN0 Fb0 c10 8n0 8Nd0 gL0 e10 mn0|15e6",
+		"Africa/Casablanca|LMT +00 +01|u.k 0 -10|01212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212|-2gMnt.E 130Lt.E rb0 Dd0 dVb0 b6p0 TX0 EoB0 LL0 gnd0 rz0 43d0 AL0 1Nd0 XX0 1Cp0 pz0 dEp0 4mn0 SyN0 AL0 1Nd0 wn0 1FB0 Db0 1zd0 Lz0 1Nf0 wM0 co0 go0 1o00 s00 dA0 vc0 11A0 A00 e00 y00 11A0 uM0 e00 Dc0 11A0 s00 e00 IM0 WM0 mo0 gM0 LA0 WM0 jA0 e00 28M0 e00 2600 gM0 2600 e00 2600 gM0 2600 e00 28M0 e00 2600 gM0 2600 e00 28M0 e00 2600 gM0 2600 e00 2600 gM0 2600 e00 28M0 e00 2600 gM0 2600 e00 2600 gM0 2600 gM0 2600 e00 2600 gM0|32e5",
+		"Africa/Ceuta|WET WEST CET CEST|0 -10 -10 -20|010101010101010101010232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232|-25KN0 11z0 drd0 18p0 3HX0 17d0 1fz0 1a10 1io0 1a00 1y7o0 LL0 gnd0 rz0 43d0 AL0 1Nd0 XX0 1Cp0 pz0 dEp0 4VB0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|85e3",
+		"Africa/El_Aaiun|LMT -01 +00 +01|Q.M 10 0 -10|012323232323232323232323232323232323232323232323232323232323232323232323232323232323|-1rDz7.c 1GVA7.c 6L0 AL0 1Nd0 XX0 1Cp0 pz0 1cBB0 AL0 1Nd0 wn0 1FB0 Db0 1zd0 Lz0 1Nf0 wM0 co0 go0 1o00 s00 dA0 vc0 11A0 A00 e00 y00 11A0 uM0 e00 Dc0 11A0 s00 e00 IM0 WM0 mo0 gM0 LA0 WM0 jA0 e00 28M0 e00 2600 gM0 2600 e00 2600 gM0 2600 e00 28M0 e00 2600 gM0 2600 e00 28M0 e00 2600 gM0 2600 e00 2600 gM0 2600 e00 28M0 e00 2600 gM0 2600 e00 2600 gM0 2600 gM0 2600 e00 2600 gM0|20e4",
+		"Africa/Johannesburg|SAST SAST SAST|-1u -20 -30|012121|-2GJdu 1Ajdu 1cL0 1cN0 1cL0|84e5",
+		"Africa/Juba|LMT CAT CAST EAT|-26.s -20 -30 -30|01212121212121212121212121212121213|-1yW26.s 1zK06.s 16L0 1iN0 17b0 1jd0 17b0 1ip0 17z0 1i10 17X0 1hB0 18n0 1hd0 19b0 1gp0 19z0 1iN0 17b0 1ip0 17z0 1i10 18n0 1hd0 18L0 1gN0 19b0 1gp0 19z0 1iN0 17z0 1i10 17X0 yGd0|",
+		"Africa/Khartoum|LMT CAT CAST EAT|-2a.8 -20 -30 -30|012121212121212121212121212121212131|-1yW2a.8 1zK0a.8 16L0 1iN0 17b0 1jd0 17b0 1ip0 17z0 1i10 17X0 1hB0 18n0 1hd0 19b0 1gp0 19z0 1iN0 17b0 1ip0 17z0 1i10 18n0 1hd0 18L0 1gN0 19b0 1gp0 19z0 1iN0 17z0 1i10 17X0 yGd0 HjL0|51e5",
+		"Africa/Monrovia|MMT MMT GMT|H.8 I.u 0|012|-23Lzg.Q 28G01.m|11e5",
+		"Africa/Ndjamena|LMT WAT WAST|-10.c -10 -20|0121|-2le10.c 2J3c0.c Wn0|13e5",
+		"Africa/Sao_Tome|LMT GMT WAT|A.J 0 -10|0121|-2le00 4i6N0 2q00|",
+		"Africa/Tripoli|LMT CET CEST EET|-Q.I -10 -20 -20|012121213121212121212121213123123|-21JcQ.I 1hnBQ.I vx0 4iP0 xx0 4eN0 Bb0 7ip0 U0n0 A10 1db0 1cN0 1db0 1dd0 1db0 1eN0 1bb0 1e10 1cL0 1c10 1db0 1dd0 1db0 1cN0 1db0 1q10 fAn0 1ep0 1db0 AKq0 TA0 1o00|11e5",
+		"Africa/Tunis|PMT CET CEST|-9.l -10 -20|0121212121212121212121212121212121|-2nco9.l 18pa9.l 1qM0 DA0 3Tc0 11B0 1ze0 WM0 7z0 3d0 14L0 1cN0 1f90 1ar0 16J0 1gXB0 WM0 1rA0 11c0 nwo0 Ko0 1cM0 1cM0 1rA0 10M0 zuM0 10N0 1aN0 1qM0 WM0 1qM0 11A0 1o00|20e5",
+		"Africa/Windhoek|+0130 SAST SAST CAT WAT|-1u -20 -30 -20 -10|01213434343434343434343434343434343434343434343434343|-2GJdu 1Ajdu 1cL0 1SqL0 9Io0 16P0 1nX0 11B0 1qL0 WN0 1qL0 11B0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1qL0 WN0 1qL0 11B0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1qL0 11B0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1qL0 WN0 1qL0 11B0 1nX0 11B0 1nX0 11B0 1nX0 11B0|32e4",
+		"America/Adak|NST NWT NPT BST BDT AHST HST HDT|b0 a0 a0 b0 a0 a0 a0 90|012034343434343434343434343434343456767676767676767676767676767676767676767676767676767676767676767676767676767676767676767676767676767676767676|-17SX0 8wW0 iB0 Qlb0 52O0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 s10 1Vz0 LB0 1BX0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 cm0 10q0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|326",
+		"America/Anchorage|AST AWT APT AHST AHDT YST AKST AKDT|a0 90 90 a0 90 90 90 80|012034343434343434343434343434343456767676767676767676767676767676767676767676767676767676767676767676767676767676767676767676767676767676767676|-17T00 8wX0 iA0 Qlb0 52O0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 s10 1Vz0 LB0 1BX0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 cm0 10q0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|30e4",
+		"America/Port_of_Spain|LMT AST|46.4 40|01|-2kNvR.U|43e3",
+		"America/Araguaina|LMT -03 -02|3c.M 30 20|0121212121212121212121212121212121212121212121212121|-2glwL.c HdKL.c 1cc0 1e10 1bX0 Ezd0 So0 1vA0 Mn0 1BB0 ML0 1BB0 zX0 qe10 xb0 2ep0 nz0 1C10 zX0 1C10 LX0 1C10 Mn0 H210 Rb0 1tB0 IL0 1Fd0 FX0 1EN0 FX0 1HB0 Lz0 dMN0 Lz0 1zd0 Rb0 1wN0 Wn0 1tB0 Rb0 1tB0 WL0 1tB0 Rb0 1zd0 On0 1HB0 FX0 ny10 Lz0|14e4",
+		"America/Argentina/Buenos_Aires|CMT -04 -03 -02|4g.M 40 30 20|01212121212121212121212121212121212121212123232323232323232|-20UHH.c pKnH.c Mn0 1iN0 Tb0 1C10 LX0 1C10 LX0 1C10 LX0 1C10 Mn0 1C10 LX0 1C10 LX0 1C10 LX0 1C10 Mn0 MN0 2jz0 MN0 4lX0 u10 5Lb0 1pB0 Fnz0 u10 uL0 1vd0 SL0 1vd0 SL0 1vd0 17z0 1cN0 1fz0 1cN0 1cL0 1cN0 asn0 Db0 zvd0 Bz0 1tB0 TX0 1wp0 Rb0 1wp0 Rb0 1wp0 TX0 A4p0 uL0 1qN0 WL0|",
+		"America/Argentina/Catamarca|CMT -04 -03 -02|4g.M 40 30 20|01212121212121212121212121212121212121212123232323132321232|-20UHH.c pKnH.c Mn0 1iN0 Tb0 1C10 LX0 1C10 LX0 1C10 LX0 1C10 Mn0 1C10 LX0 1C10 LX0 1C10 LX0 1C10 Mn0 MN0 2jz0 MN0 4lX0 u10 5Lb0 1pB0 Fnz0 u10 uL0 1vd0 SL0 1vd0 SL0 1vd0 17z0 1cN0 1fz0 1cN0 1cL0 1cN0 asn0 Db0 zvd0 Bz0 1tB0 TX0 1wp0 Rb0 1wq0 Ra0 1wp0 TX0 rlB0 7B0 8zb0 uL0|",
+		"America/Argentina/Cordoba|CMT -04 -03 -02|4g.M 40 30 20|01212121212121212121212121212121212121212123232323132323232|-20UHH.c pKnH.c Mn0 1iN0 Tb0 1C10 LX0 1C10 LX0 1C10 LX0 1C10 Mn0 1C10 LX0 1C10 LX0 1C10 LX0 1C10 Mn0 MN0 2jz0 MN0 4lX0 u10 5Lb0 1pB0 Fnz0 u10 uL0 1vd0 SL0 1vd0 SL0 1vd0 17z0 1cN0 1fz0 1cN0 1cL0 1cN0 asn0 Db0 zvd0 Bz0 1tB0 TX0 1wp0 Rb0 1wq0 Ra0 1wp0 TX0 A4p0 uL0 1qN0 WL0|",
+		"America/Argentina/Jujuy|CMT -04 -03 -02|4g.M 40 30 20|012121212121212121212121212121212121212121232323121323232|-20UHH.c pKnH.c Mn0 1iN0 Tb0 1C10 LX0 1C10 LX0 1C10 LX0 1C10 Mn0 1C10 LX0 1C10 LX0 1C10 LX0 1C10 Mn0 MN0 2jz0 MN0 4lX0 u10 5Lb0 1pB0 Fnz0 u10 uL0 1vd0 SL0 1vd0 SL0 1vd0 17z0 1cN0 1fz0 1cN0 1cL0 1cN0 asn0 Db0 zvd0 Bz0 1tB0 TX0 1ze0 TX0 1ld0 WK0 1wp0 TX0 A4p0 uL0|",
+		"America/Argentina/La_Rioja|CMT -04 -03 -02|4g.M 40 30 20|012121212121212121212121212121212121212121232323231232321232|-20UHH.c pKnH.c Mn0 1iN0 Tb0 1C10 LX0 1C10 LX0 1C10 LX0 1C10 Mn0 1C10 LX0 1C10 LX0 1C10 LX0 1C10 Mn0 MN0 2jz0 MN0 4lX0 u10 5Lb0 1pB0 Fnz0 u10 uL0 1vd0 SL0 1vd0 SL0 1vd0 17z0 1cN0 1fz0 1cN0 1cL0 1cN0 asn0 Db0 zvd0 Bz0 1tB0 TX0 1wp0 Qn0 qO0 16n0 Rb0 1wp0 TX0 rlB0 7B0 8zb0 uL0|",
+		"America/Argentina/Mendoza|CMT -04 -03 -02|4g.M 40 30 20|01212121212121212121212121212121212121212123232312121321232|-20UHH.c pKnH.c Mn0 1iN0 Tb0 1C10 LX0 1C10 LX0 1C10 LX0 1C10 Mn0 1C10 LX0 1C10 LX0 1C10 LX0 1C10 Mn0 MN0 2jz0 MN0 4lX0 u10 5Lb0 1pB0 Fnz0 u10 uL0 1vd0 SL0 1vd0 SL0 1vd0 17z0 1cN0 1fz0 1cN0 1cL0 1cN0 asn0 Db0 zvd0 Bz0 1tB0 TX0 1u20 SL0 1vd0 Tb0 1wp0 TW0 ri10 Op0 7TX0 uL0|",
+		"America/Argentina/Rio_Gallegos|CMT -04 -03 -02|4g.M 40 30 20|01212121212121212121212121212121212121212123232323232321232|-20UHH.c pKnH.c Mn0 1iN0 Tb0 1C10 LX0 1C10 LX0 1C10 LX0 1C10 Mn0 1C10 LX0 1C10 LX0 1C10 LX0 1C10 Mn0 MN0 2jz0 MN0 4lX0 u10 5Lb0 1pB0 Fnz0 u10 uL0 1vd0 SL0 1vd0 SL0 1vd0 17z0 1cN0 1fz0 1cN0 1cL0 1cN0 asn0 Db0 zvd0 Bz0 1tB0 TX0 1wp0 Rb0 1wp0 Rb0 1wp0 TX0 rlB0 7B0 8zb0 uL0|",
+		"America/Argentina/Salta|CMT -04 -03 -02|4g.M 40 30 20|012121212121212121212121212121212121212121232323231323232|-20UHH.c pKnH.c Mn0 1iN0 Tb0 1C10 LX0 1C10 LX0 1C10 LX0 1C10 Mn0 1C10 LX0 1C10 LX0 1C10 LX0 1C10 Mn0 MN0 2jz0 MN0 4lX0 u10 5Lb0 1pB0 Fnz0 u10 uL0 1vd0 SL0 1vd0 SL0 1vd0 17z0 1cN0 1fz0 1cN0 1cL0 1cN0 asn0 Db0 zvd0 Bz0 1tB0 TX0 1wp0 Rb0 1wq0 Ra0 1wp0 TX0 A4p0 uL0|",
+		"America/Argentina/San_Juan|CMT -04 -03 -02|4g.M 40 30 20|012121212121212121212121212121212121212121232323231232321232|-20UHH.c pKnH.c Mn0 1iN0 Tb0 1C10 LX0 1C10 LX0 1C10 LX0 1C10 Mn0 1C10 LX0 1C10 LX0 1C10 LX0 1C10 Mn0 MN0 2jz0 MN0 4lX0 u10 5Lb0 1pB0 Fnz0 u10 uL0 1vd0 SL0 1vd0 SL0 1vd0 17z0 1cN0 1fz0 1cN0 1cL0 1cN0 asn0 Db0 zvd0 Bz0 1tB0 TX0 1wp0 Qn0 qO0 16n0 Rb0 1wp0 TX0 rld0 m10 8lb0 uL0|",
+		"America/Argentina/San_Luis|CMT -04 -03 -02|4g.M 40 30 20|012121212121212121212121212121212121212121232323121212321212|-20UHH.c pKnH.c Mn0 1iN0 Tb0 1C10 LX0 1C10 LX0 1C10 LX0 1C10 Mn0 1C10 LX0 1C10 LX0 1C10 LX0 1C10 Mn0 MN0 2jz0 MN0 4lX0 u10 5Lb0 1pB0 Fnz0 u10 uL0 1vd0 SL0 1vd0 SL0 1vd0 17z0 1cN0 1fz0 1cN0 1cL0 1cN0 asn0 Db0 zvd0 Bz0 1tB0 XX0 1q20 SL0 AN0 vDb0 m10 8lb0 8L0 jd0 1qN0 WL0 1qN0|",
+		"America/Argentina/Tucuman|CMT -04 -03 -02|4g.M 40 30 20|0121212121212121212121212121212121212121212323232313232123232|-20UHH.c pKnH.c Mn0 1iN0 Tb0 1C10 LX0 1C10 LX0 1C10 LX0 1C10 Mn0 1C10 LX0 1C10 LX0 1C10 LX0 1C10 Mn0 MN0 2jz0 MN0 4lX0 u10 5Lb0 1pB0 Fnz0 u10 uL0 1vd0 SL0 1vd0 SL0 1vd0 17z0 1cN0 1fz0 1cN0 1cL0 1cN0 asn0 Db0 zvd0 Bz0 1tB0 TX0 1wp0 Rb0 1wq0 Ra0 1wp0 TX0 rlB0 4N0 8BX0 uL0 1qN0 WL0|",
+		"America/Argentina/Ushuaia|CMT -04 -03 -02|4g.M 40 30 20|01212121212121212121212121212121212121212123232323232321232|-20UHH.c pKnH.c Mn0 1iN0 Tb0 1C10 LX0 1C10 LX0 1C10 LX0 1C10 Mn0 1C10 LX0 1C10 LX0 1C10 LX0 1C10 Mn0 MN0 2jz0 MN0 4lX0 u10 5Lb0 1pB0 Fnz0 u10 uL0 1vd0 SL0 1vd0 SL0 1vd0 17z0 1cN0 1fz0 1cN0 1cL0 1cN0 asn0 Db0 zvd0 Bz0 1tB0 TX0 1wp0 Rb0 1wp0 Rb0 1wp0 TX0 rkN0 8p0 8zb0 uL0|",
+		"America/Curacao|LMT -0430 AST|4z.L 4u 40|012|-2kV7o.d 28KLS.d|15e4",
+		"America/Asuncion|AMT -04 -03|3O.E 40 30|012121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212|-1x589.k 1DKM9.k 3CL0 3Dd0 10L0 1pB0 10n0 1pB0 10n0 1pB0 1cL0 1dd0 1db0 1dd0 1cL0 1dd0 1cL0 1dd0 1cL0 1dd0 1db0 1dd0 1cL0 1dd0 1cL0 1dd0 1cL0 1dd0 1db0 1dd0 1cL0 1lB0 14n0 1dd0 1cL0 1fd0 WL0 1rd0 1aL0 1dB0 Xz0 1qp0 Xb0 1qN0 10L0 1rB0 TX0 1tB0 WL0 1qN0 11z0 1o10 11z0 1o10 11z0 1qN0 1cL0 WN0 1qL0 11B0 1nX0 1ip0 WL0 1qN0 WL0 1qN0 WL0 1tB0 TX0 1tB0 TX0 1tB0 19X0 1a10 1fz0 1a10 1fz0 1cN0 17b0 1ip0 17b0 1ip0 17b0 1ip0 19X0 1fB0 19X0 1fB0 19X0 1ip0 17b0 1ip0 17b0 1ip0 19X0 1fB0 19X0 1fB0 19X0 1fB0 19X0 1ip0 17b0 1ip0 17b0 1ip0 19X0 1fB0 19X0 1fB0 19X0 1ip0 17b0 1ip0 17b0 1ip0 19X0 1fB0 19X0 1fB0 19X0 1fB0 19X0 1ip0 17b0 1ip0 17b0 1ip0|28e5",
+		"America/Atikokan|CST CDT CWT CPT EST|60 50 50 50 50|0101234|-25TQ0 1in0 Rnb0 3je0 8x30 iw0|28e2",
+		"America/Bahia_Banderas|LMT MST CST PST MDT CDT|71 70 60 80 60 50|0121212131414141414141414141414141414152525252525252525252525252525252525252525252525252525252|-1UQF0 deL0 8lc0 17c0 10M0 1dd0 otX0 gmN0 P2N0 13Vd0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 1fB0 WL0 1fB0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nW0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0|84e3",
+		"America/Bahia|LMT -03 -02|2y.4 30 20|01212121212121212121212121212121212121212121212121212121212121|-2glxp.U HdLp.U 1cc0 1e10 1bX0 Ezd0 So0 1vA0 Mn0 1BB0 ML0 1BB0 zX0 qe10 xb0 2ep0 nz0 1C10 zX0 1C10 LX0 1C10 Mn0 H210 Rb0 1tB0 IL0 1Fd0 FX0 1EN0 FX0 1HB0 Lz0 1EN0 Lz0 1C10 IL0 1HB0 Db0 1HB0 On0 1zd0 On0 1zd0 Lz0 1zd0 Rb0 1wN0 Wn0 1tB0 Rb0 1tB0 WL0 1tB0 Rb0 1zd0 On0 1HB0 FX0 l5B0 Rb0|27e5",
+		"America/Barbados|LMT BMT AST ADT|3W.t 3W.t 40 30|01232323232|-1Q0I1.v jsM0 1ODC1.v IL0 1ip0 17b0 1ip0 17b0 1ld0 13b0|28e4",
+		"America/Belem|LMT -03 -02|3d.U 30 20|012121212121212121212121212121|-2glwK.4 HdKK.4 1cc0 1e10 1bX0 Ezd0 So0 1vA0 Mn0 1BB0 ML0 1BB0 zX0 qe10 xb0 2ep0 nz0 1C10 zX0 1C10 LX0 1C10 Mn0 H210 Rb0 1tB0 IL0 1Fd0 FX0|20e5",
+		"America/Belize|LMT CST -0530 CDT|5Q.M 60 5u 50|01212121212121212121212121212121212121212121212121213131|-2kBu7.c fPA7.c Onu 1zcu Rbu 1wou Rbu 1wou Rbu 1zcu Onu 1zcu Onu 1zcu Rbu 1wou Rbu 1wou Rbu 1wou Rbu 1zcu Onu 1zcu Onu 1zcu Rbu 1wou Rbu 1wou Rbu 1zcu Onu 1zcu Onu 1zcu Onu 1zcu Rbu 1wou Rbu 1wou Rbu 1zcu Onu 1zcu Onu 1zcu Rbu 1wou Rbu 1f0Mu qn0 lxB0 mn0|57e3",
+		"America/Blanc-Sablon|AST ADT AWT APT|40 30 30 30|010230|-25TS0 1in0 UGp0 8x50 iu0|11e2",
+		"America/Boa_Vista|LMT -04 -03|42.E 40 30|0121212121212121212121212121212121|-2glvV.k HdKV.k 1cc0 1e10 1bX0 Ezd0 So0 1vA0 Mn0 1BB0 ML0 1BB0 zX0 qe10 xb0 2ep0 nz0 1C10 zX0 1C10 LX0 1C10 Mn0 H210 Rb0 1tB0 IL0 1Fd0 FX0 smp0 WL0 1tB0 2L0|62e2",
+		"America/Bogota|BMT -05 -04|4U.g 50 40|0121|-2eb73.I 38yo3.I 2en0|90e5",
+		"America/Boise|PST PDT MST MWT MPT MDT|80 70 70 60 60 60|0101023425252525252525252525252525252525252525252525252525252525252525252525252525252525252525252525252525252525252525252525252525252525252525252525252|-261q0 1nX0 11B0 1nX0 8C10 JCL0 8x20 ix0 QwN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 Dd0 1Kn0 LB0 1BX0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|21e4",
+		"America/Cambridge_Bay|-00 MST MWT MPT MDDT MDT CST CDT EST|0 70 60 60 50 60 60 50 50|0123141515151515151515151515151515151515151515678651515151515151515151515151515151515151515151515151515151515151515151515151|-21Jc0 RO90 8x20 ix0 LCL0 1fA0 zgO0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11A0 1nX0 2K0 WQ0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|15e2",
+		"America/Campo_Grande|LMT -04 -03|3C.s 40 30|01212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121|-2glwl.w HdLl.w 1cc0 1e10 1bX0 Ezd0 So0 1vA0 Mn0 1BB0 ML0 1BB0 zX0 qe10 xb0 2ep0 nz0 1C10 zX0 1C10 LX0 1C10 Mn0 H210 Rb0 1tB0 IL0 1Fd0 FX0 1EN0 FX0 1HB0 Lz0 1EN0 Lz0 1C10 IL0 1HB0 Db0 1HB0 On0 1zd0 On0 1zd0 Lz0 1zd0 Rb0 1wN0 Wn0 1tB0 Rb0 1tB0 WL0 1tB0 Rb0 1zd0 On0 1HB0 FX0 1C10 Lz0 1Ip0 HX0 1zd0 On0 1HB0 IL0 1wp0 On0 1C10 Lz0 1C10 On0 1zd0 On0 1zd0 Rb0 1zd0 Lz0 1C10 Lz0 1C10 On0 1zd0 On0 1zd0 On0 1zd0 On0 1HB0 FX0|77e4",
+		"America/Cancun|LMT CST EST EDT CDT|5L.4 60 50 40 50|0123232341414141414141414141414141414141412|-1UQG0 2q2o0 yLB0 1lb0 14p0 1lb0 14p0 Lz0 xB0 14p0 1nX0 11B0 1nX0 1fB0 WL0 1fB0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 Dd0|63e4",
+		"America/Caracas|CMT -0430 -04|4r.E 4u 40|01212|-2kV7w.k 28KM2.k 1IwOu kqo0|29e5",
+		"America/Cayenne|LMT -04 -03|3t.k 40 30|012|-2mrwu.E 2gWou.E|58e3",
+		"America/Panama|CMT EST|5j.A 50|01|-2uduE.o|15e5",
+		"America/Chicago|CST CDT EST CWT CPT|60 50 50 50 50|01010101010101010101010101010101010102010101010103401010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010|-261s0 1nX0 11B0 1nX0 1wp0 TX0 WN0 1qL0 1cN0 WL0 1qN0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1qN0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1qN0 WL0 1qN0 11z0 1o10 11z0 11B0 1Hz0 14p0 11z0 1o10 11z0 1qN0 WL0 1qN0 11z0 1o10 11z0 RB0 8x30 iw0 1o10 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1qN0 WL0 1qN0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1o10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 s10 1Vz0 LB0 1BX0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|92e5",
+		"America/Chihuahua|LMT MST CST CDT MDT|74.k 70 60 50 60|0121212323241414141414141414141414141414141414141414141414141414141414141414141414141414141|-1UQF0 deL0 8lc0 17c0 10M0 1dd0 2zQN0 1lb0 14p0 1lb0 14q0 1lb0 14p0 1nX0 11B0 1nX0 1fB0 WL0 1fB0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0|81e4",
+		"America/Costa_Rica|SJMT CST CDT|5A.d 60 50|0121212121|-1Xd6n.L 2lu0n.L Db0 1Kp0 Db0 pRB0 15b0 1kp0 mL0|12e5",
+		"America/Creston|MST PST|70 80|010|-29DR0 43B0|53e2",
+		"America/Cuiaba|LMT -04 -03|3I.k 40 30|012121212121212121212121212121212121212121212121212121212121212121212121212121212121212121|-2glwf.E HdLf.E 1cc0 1e10 1bX0 Ezd0 So0 1vA0 Mn0 1BB0 ML0 1BB0 zX0 qe10 xb0 2ep0 nz0 1C10 zX0 1C10 LX0 1C10 Mn0 H210 Rb0 1tB0 IL0 1Fd0 FX0 1EN0 FX0 1HB0 Lz0 1EN0 Lz0 1C10 IL0 1HB0 Db0 1HB0 On0 1zd0 On0 1zd0 Lz0 1zd0 Rb0 1wN0 Wn0 1tB0 Rb0 1tB0 WL0 1tB0 Rb0 1zd0 On0 1HB0 FX0 4a10 HX0 1zd0 On0 1HB0 IL0 1wp0 On0 1C10 Lz0 1C10 On0 1zd0 On0 1zd0 Rb0 1zd0 Lz0 1C10 Lz0 1C10 On0 1zd0 On0 1zd0 On0 1zd0 On0 1HB0 FX0|54e4",
+		"America/Danmarkshavn|LMT -03 -02 GMT|1e.E 30 20 0|01212121212121212121212121212121213|-2a5WJ.k 2z5fJ.k 19U0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 DC0|8",
+		"America/Dawson_Creek|PST PDT PWT PPT MST|80 70 70 70 70|0102301010101010101010101010101010101010101010101010101014|-25TO0 1in0 UGp0 8x10 iy0 3NB0 11z0 1o10 11z0 1o10 11z0 1qN0 WL0 1qN0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1qN0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1qN0 WL0 1qN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 ML0|12e3",
+		"America/Dawson|YST YDT YWT YPT YDDT PST PDT MST|90 80 80 80 70 80 70 70|01010230405656565656565656565656565656565656565656565656565656565656565656565656565656565657|-25TN0 1in0 1o10 13V0 Ser0 8x00 iz0 LCL0 1fA0 jrA0 fNd0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0|13e2",
+		"America/Denver|MST MDT MWT MPT|70 60 60 60|01010101023010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010|-261r0 1nX0 11B0 1nX0 11B0 1qL0 WN0 mn0 Ord0 8x20 ix0 LCN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 s10 1Vz0 LB0 1BX0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|26e5",
+		"America/Detroit|LMT CST EST EWT EPT EDT|5w.b 60 50 40 40 40|0123425252525252525252525252525252525252525252525252525252525252525252525252525252525252525252525252525252525252525252525252525252525252525252|-2Cgir.N peqr.N 156L0 8x40 iv0 6fd0 11z0 JxX1 SMX 1cN0 1cL0 aW10 1cL0 s10 1Vz0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|37e5",
+		"America/Edmonton|LMT MST MDT MWT MPT|7x.Q 70 60 60 60|0121212121212134121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121|-2yd4q.8 shdq.8 1in0 17d0 hz0 2dB0 1fz0 1a10 11z0 1qN0 WL0 1qN0 11z0 IGN0 8x20 ix0 3NB0 11z0 XQp0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|10e5",
+		"America/Eirunepe|LMT -05 -04|4D.s 50 40|0121212121212121212121212121212121|-2glvk.w HdLk.w 1cc0 1e10 1bX0 Ezd0 So0 1vA0 Mn0 1BB0 ML0 1BB0 zX0 qe10 xb0 2ep0 nz0 1C10 zX0 1C10 LX0 1C10 Mn0 H210 Rb0 1tB0 IL0 1Fd0 FX0 dPB0 On0 yTd0 d5X0|31e3",
+		"America/El_Salvador|LMT CST CDT|5U.M 60 50|012121|-1XiG3.c 2Fvc3.c WL0 1qN0 WL0|11e5",
+		"America/Tijuana|LMT MST PST PDT PWT PPT|7M.4 70 80 70 70 70|012123245232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232|-1UQE0 4PX0 8mM0 8lc0 SN0 1cL0 pHB0 83r0 zI0 5O10 1Rz0 cOO0 11A0 1o00 11A0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1o00 11A0 BUp0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 U10 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|20e5",
+		"America/Fort_Nelson|PST PDT PWT PPT MST|80 70 70 70 70|01023010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010104|-25TO0 1in0 UGp0 8x10 iy0 3NB0 11z0 1o10 11z0 1o10 11z0 1qN0 WL0 1qN0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1qN0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1qN0 WL0 1qN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0|39e2",
+		"America/Fort_Wayne|CST CDT CWT CPT EST EDT|60 50 50 50 50 40|010101023010101010101010101040454545454545454545454545454545454545454545454545454545454545454545454|-261s0 1nX0 11B0 1nX0 QI10 Db0 RB0 8x30 iw0 1o10 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1qN0 WL0 1qN0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1o10 5Tz0 1o10 qLb0 1cL0 1cN0 1cL0 1qhd0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|",
+		"America/Fortaleza|LMT -03 -02|2y 30 20|0121212121212121212121212121212121212121|-2glxq HdLq 1cc0 1e10 1bX0 Ezd0 So0 1vA0 Mn0 1BB0 ML0 1BB0 zX0 qe10 xb0 2ep0 nz0 1C10 zX0 1C10 LX0 1C10 Mn0 H210 Rb0 1tB0 IL0 1Fd0 FX0 1EN0 FX0 1HB0 Lz0 nsp0 WL0 1tB0 5z0 2mN0 On0|34e5",
+		"America/Glace_Bay|LMT AST ADT AWT APT|3X.M 40 30 30 30|012134121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121|-2IsI0.c CwO0.c 1in0 UGp0 8x50 iu0 iq10 11z0 Jg10 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|19e3",
+		"America/Godthab|LMT -03 -02|3q.U 30 20|0121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121|-2a5Ux.4 2z5dx.4 19U0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|17e3",
+		"America/Goose_Bay|NST NDT NST NDT NWT NPT AST ADT ADDT|3u.Q 2u.Q 3u 2u 2u 2u 40 30 20|010232323232323245232323232323232323232323232323232323232326767676767676767676767676767676767676767676768676767676767676767676767676767676767676767676767676767676767676767676767676767676767676767676767676|-25TSt.8 1in0 DXb0 2HbX.8 WL0 1qN0 WL0 1qN0 WL0 1tB0 TX0 1tB0 WL0 1qN0 WL0 1qN0 7UHu itu 1tB0 WL0 1qN0 WL0 1qN0 WL0 1qN0 WL0 1tB0 WL0 1ld0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1qN0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1o10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 S10 g0u 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14n1 1lb0 14p0 1nW0 11C0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zcX Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|76e2",
+		"America/Grand_Turk|KMT EST EDT AST|57.a 50 40 40|01212121212121212121212121212121212121212121212121212121212121212121212121232121212121212121212121212121212121212121|-2l1uQ.O 2HHBQ.O 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 5Ip0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|37e2",
+		"America/Guatemala|LMT CST CDT|62.4 60 50|0121212121|-24KhV.U 2efXV.U An0 mtd0 Nz0 ifB0 17b0 zDB0 11z0|13e5",
+		"America/Guayaquil|QMT -05 -04|5e 50 40|0121|-1yVSK 2uILK rz0|27e5",
+		"America/Guyana|LMT -0345 -03 -04|3Q.E 3J 30 40|0123|-2dvU7.k 2r6LQ.k Bxbf|80e4",
+		"America/Halifax|LMT AST ADT AWT APT|4e.o 40 30 30 30|0121212121212121212121212121212121212121212121212134121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121|-2IsHJ.A xzzJ.A 1db0 3I30 1in0 3HX0 IL0 1E10 ML0 1yN0 Pb0 1Bd0 Mn0 1Bd0 Rz0 1w10 Xb0 1w10 LX0 1w10 Xb0 1w10 Lz0 1C10 Jz0 1E10 OL0 1yN0 Un0 1qp0 Xb0 1qp0 11X0 1w10 Lz0 1HB0 LX0 1C10 FX0 1w10 Xb0 1qp0 Xb0 1BB0 LX0 1td0 Xb0 1qp0 Xb0 Rf0 8x50 iu0 1o10 11z0 1o10 11z0 1o10 11z0 1o10 11z0 3Qp0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 3Qp0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 6i10 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|39e4",
+		"America/Havana|HMT CST CDT|5t.A 50 40|012121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121|-1Meuu.o 72zu.o ML0 sld0 An0 1Nd0 Db0 1Nd0 An0 6Ep0 An0 1Nd0 An0 JDd0 Mn0 1Ap0 On0 1fd0 11X0 1qN0 WL0 1wp0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 14n0 1ld0 14L0 1kN0 15b0 1kp0 1cL0 1cN0 1fz0 1a10 1fz0 1fB0 11z0 14p0 1nX0 11B0 1nX0 1o10 11z0 1o10 11z0 1o10 11z0 1o10 14n0 1ld0 14n0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 1a10 1in0 1a10 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1cM0 1cM0 1cM0 1fA0 17c0 1o00 11A0 1qM0 11A0 1o00 11A0 1o00 14o0 1lc0 14o0 1lc0 11A0 6i00 Rc0 1wo0 U00 1tA0 Rc0 1wo0 U00 1wo0 U00 1zc0 U00 1qM0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Rc0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Rc0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Rc0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Rc0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0|21e5",
+		"America/Hermosillo|LMT MST CST PST MDT|7n.Q 70 60 80 60|0121212131414141|-1UQF0 deL0 8lc0 17c0 10M0 1dd0 otX0 gmN0 P2N0 13Vd0 1lb0 14p0 1lb0 14p0 1lb0|64e4",
+		"America/Indiana/Knox|CST CDT CWT CPT EST|60 50 50 50 50|0101023010101010101010101010101010101040101010101010101010101010101010101010101010101010141010101010101010101010101010101010101010101010101010101010101010|-261s0 1nX0 11B0 1nX0 SgN0 8x30 iw0 3NB0 11z0 1o10 11z0 1o10 11z0 1qN0 WL0 1qN0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1o10 1fz0 1cN0 1cL0 1cN0 11z0 1o10 11z0 1o10 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 3Cn0 8wp0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 s10 1Vz0 LB0 1BX0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 z8o0 1o00 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|",
+		"America/Indiana/Marengo|CST CDT CWT CPT EST EDT|60 50 50 50 50 40|0101023010101010101010104545454545414545454545454545454545454545454545454545454545454545454545454545454|-261s0 1nX0 11B0 1nX0 SgN0 8x30 iw0 dyN0 11z0 6fd0 11z0 1o10 11z0 1qN0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1qN0 jrz0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 s10 1VA0 LA0 1BX0 1e6p0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|",
+		"America/Indiana/Petersburg|CST CDT CWT CPT EST EDT|60 50 50 50 50 40|01010230101010101010101010104010101010101010101010141014545454545454545454545454545454545454545454545454545454545454|-261s0 1nX0 11B0 1nX0 SgN0 8x30 iw0 njX0 WN0 1qN0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1qN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 3Fb0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 s10 1Vz0 LB0 1BX0 1cN0 1fz0 1a10 1fz0 19co0 1o00 Rd0 1zb0 Oo0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|",
+		"America/Indiana/Tell_City|CST CDT CWT CPT EST EDT|60 50 50 50 50 40|01010230101010101010101010401054541010101010101010101010101010101010101010101010101010101010101010|-261s0 1nX0 11B0 1nX0 SgN0 8x30 iw0 njX0 WN0 1qN0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1qN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 8wn0 1cN0 1cL0 1cN0 1cK0 1cN0 1cL0 1qhd0 1o00 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|",
+		"America/Indiana/Vevay|CST CDT CWT CPT EST EDT|60 50 50 50 50 40|010102304545454545454545454545454545454545454545454545454545454545454545454545454|-261s0 1nX0 11B0 1nX0 SgN0 8x30 iw0 kPB0 Awn0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1lnd0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|",
+		"America/Indiana/Vincennes|CST CDT CWT CPT EST EDT|60 50 50 50 50 40|01010230101010101010101010101010454541014545454545454545454545454545454545454545454545454545454545454|-261s0 1nX0 11B0 1nX0 SgN0 8x30 iw0 1o10 11z0 g0p0 11z0 1o10 11z0 1qL0 WN0 1qN0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1o10 1fz0 1cN0 WL0 1qN0 1cL0 1cN0 1cL0 1cN0 caL0 1cL0 1cN0 1cL0 1qhd0 1o00 Rd0 1zb0 Oo0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|",
+		"America/Indiana/Winamac|CST CDT CWT CPT EST EDT|60 50 50 50 50 40|01010230101010101010101010101010101010454541054545454545454545454545454545454545454545454545454545454545454|-261s0 1nX0 11B0 1nX0 SgN0 8x30 iw0 1o10 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1qN0 WL0 1qN0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1o10 1fz0 1cN0 1cL0 1cN0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1qN0 jrz0 1cL0 1cN0 1cL0 1qhd0 1o00 Rd0 1za0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|",
+		"America/Inuvik|-00 PST PDDT MST MDT|0 80 60 70 60|0121343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343|-FnA0 tWU0 1fA0 wPe0 2pz0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|35e2",
+		"America/Iqaluit|-00 EWT EPT EST EDDT EDT CST CDT|0 40 40 50 30 40 60 50|01234353535353535353535353535353535353535353567353535353535353535353535353535353535353535353535353535353535353535353535353|-16K00 7nX0 iv0 LCL0 1fA0 zgO0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11C0 1nX0 11A0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|67e2",
+		"America/Jamaica|KMT EST EDT|57.a 50 40|0121212121212121212121|-2l1uQ.O 2uM1Q.O 1Vz0 LB0 1BX0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0|94e4",
+		"America/Juneau|PST PWT PPT PDT YDT YST AKST AKDT|80 70 70 70 80 90 90 80|01203030303030303030303030403030356767676767676767676767676767676767676767676767676767676767676767676767676767676767676767676767676767676767676|-17T20 8x10 iy0 Vo10 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 s10 1Vz0 LB0 1BX0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cM0 1cM0 1cL0 1cN0 1fz0 1a10 1fz0 co0 10q0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|33e3",
+		"America/Kentucky/Louisville|CST CDT CWT CPT EST EDT|60 50 50 50 50 40|0101010102301010101010101010101010101454545454545414545454545454545454545454545454545454545454545454545454545454545454545454545454545454545454545454545454545454545454545454545454|-261s0 1nX0 11B0 1nX0 3Fd0 Nb0 LPd0 11z0 RB0 8x30 iw0 1nX1 e0X 9vd0 WL0 1qN0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1qN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 xz0 gso0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 s10 1VA0 LA0 1BX0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|",
+		"America/Kentucky/Monticello|CST CDT CWT CPT EST EDT|60 50 50 50 50 40|0101023010101010101010101010101010101010101010101010101010101010101010101454545454545454545454545454545454545454545454545454545454545454545454545454|-261s0 1nX0 11B0 1nX0 SgN0 8x30 iw0 SWp0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 s10 1Vz0 LB0 1BX0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11A0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|",
+		"America/La_Paz|CMT BST -04|4w.A 3w.A 40|012|-1x37r.o 13b0|19e5",
+		"America/Lima|LMT -05 -04|58.A 50 40|0121212121212121|-2tyGP.o 1bDzP.o zX0 1aN0 1cL0 1cN0 1cL0 1PrB0 zX0 1O10 zX0 6Gp0 zX0 98p0 zX0|11e6",
+		"America/Los_Angeles|PST PDT PWT PPT|80 70 70 70|010102301010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010|-261q0 1nX0 11B0 1nX0 SgN0 8x10 iy0 5Wp1 1VaX 3dA0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1a00 1fA0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 s10 1Vz0 LB0 1BX0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|15e6",
+		"America/Maceio|LMT -03 -02|2m.Q 30 20|012121212121212121212121212121212121212121|-2glxB.8 HdLB.8 1cc0 1e10 1bX0 Ezd0 So0 1vA0 Mn0 1BB0 ML0 1BB0 zX0 qe10 xb0 2ep0 nz0 1C10 zX0 1C10 LX0 1C10 Mn0 H210 Rb0 1tB0 IL0 1Fd0 FX0 1EN0 FX0 1HB0 Lz0 dMN0 Lz0 8Q10 WL0 1tB0 5z0 2mN0 On0|93e4",
+		"America/Managua|MMT CST EST CDT|5J.c 60 50 50|0121313121213131|-1quie.M 1yAMe.M 4mn0 9Up0 Dz0 1K10 Dz0 s3F0 1KH0 DB0 9In0 k8p0 19X0 1o30 11y0|22e5",
+		"America/Manaus|LMT -04 -03|40.4 40 30|01212121212121212121212121212121|-2glvX.U HdKX.U 1cc0 1e10 1bX0 Ezd0 So0 1vA0 Mn0 1BB0 ML0 1BB0 zX0 qe10 xb0 2ep0 nz0 1C10 zX0 1C10 LX0 1C10 Mn0 H210 Rb0 1tB0 IL0 1Fd0 FX0 dPB0 On0|19e5",
+		"America/Martinique|FFMT AST ADT|44.k 40 30|0121|-2mPTT.E 2LPbT.E 19X0|39e4",
+		"America/Matamoros|LMT CST CDT|6E 60 50|0121212121212121212121212121212121212121212121212121212121212121212121212121212121212121|-1UQG0 2FjC0 1nX0 i6p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 1fB0 WL0 1fB0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 U10 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|45e4",
+		"America/Mazatlan|LMT MST CST PST MDT|75.E 70 60 80 60|0121212131414141414141414141414141414141414141414141414141414141414141414141414141414141414141|-1UQF0 deL0 8lc0 17c0 10M0 1dd0 otX0 gmN0 P2N0 13Vd0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 1fB0 WL0 1fB0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0|44e4",
+		"America/Menominee|CST CDT CWT CPT EST|60 50 50 50 50|01010230101041010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010|-261s0 1nX0 11B0 1nX0 SgN0 8x30 iw0 1o10 11z0 LCN0 1fz0 6410 9Jb0 1cM0 s10 1Vz0 LB0 1BX0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|85e2",
+		"America/Merida|LMT CST EST CDT|5W.s 60 50 50|0121313131313131313131313131313131313131313131313131313131313131313131313131313131313131|-1UQG0 2q2o0 2hz0 wu30 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 1fB0 WL0 1fB0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0|11e5",
+		"America/Metlakatla|PST PWT PPT PDT AKST AKDT|80 70 70 70 90 80|01203030303030303030303030303030304545450454545454545454545454545454545454545454|-17T20 8x10 iy0 Vo10 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 s10 1Vz0 LB0 1BX0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1hU10 Rd0 1zb0 Op0 1zb0 Op0 1zb0 uM0 jB0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|14e2",
+		"America/Mexico_City|LMT MST CST CDT CWT|6A.A 70 60 50 50|012121232324232323232323232323232323232323232323232323232323232323232323232323232323232323232323232|-1UQF0 deL0 8lc0 17c0 10M0 1dd0 gEn0 TX0 3xd0 Jb0 6zB0 SL0 e5d0 17b0 1Pff0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 1fB0 WL0 1fB0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0|20e6",
+		"America/Miquelon|LMT AST -03 -02|3I.E 40 30 20|012323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232|-2mKkf.k 2LTAf.k gQ10 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|61e2",
+		"America/Moncton|EST AST ADT AWT APT|50 40 30 30 30|012121212121212121212134121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121|-2IsH0 CwN0 1in0 zAo0 An0 1Nd0 An0 1Nd0 An0 1Nd0 An0 1Nd0 An0 1Nd0 An0 1K10 Lz0 1zB0 NX0 1u10 Wn0 S20 8x50 iu0 1o10 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1qN0 WL0 1qN0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1qN0 11z0 1o10 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 3Cp0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14n1 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 ReX 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|64e3",
+		"America/Monterrey|LMT CST CDT|6F.g 60 50|0121212121212121212121212121212121212121212121212121212121212121212121212121212121212121|-1UQG0 2FjC0 1nX0 i6p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 1fB0 WL0 1fB0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0|41e5",
+		"America/Montevideo|LMT MMT -04 -03 -0330 -0230 -02 -0130|3I.P 3I.P 40 30 3u 2u 20 1u|012343434343434343434343435353636353636375363636363636363636363636363636363636363636363|-2tRUf.9 sVc0 8jcf.9 1db0 1dcu 1cLu 1dcu 1cLu ircu 11zu 1o0u 11zu 1o0u 11zu 1o0u 11zu 1qMu WLu 1qMu WLu 1fAu 1cLu 1o0u 11zu NAu 3jXu zXu Dq0u 19Xu pcu jz0 cm10 19X0 6tB0 1fbu 3o0u jX0 4vB0 xz0 3Cp0 mmu 1a10 IMu Db0 4c10 uL0 1Nd0 An0 1SN0 uL0 mp0 28L0 iPB0 un0 1SN0 xz0 1zd0 Lz0 1zd0 Rb0 1zd0 On0 1wp0 Rb0 s8p0 1fB0 1ip0 11z0 1ld0 14n0 1o10 11z0 1o10 11z0 1o10 14n0 1ld0 14n0 1ld0 14n0 1o10 11z0 1o10 11z0 1o10 11z0|17e5",
+		"America/Toronto|EST EDT EWT EPT|50 40 40 40|01010101010101010101010101010101010101010101012301010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010|-25TR0 1in0 11Wu 1nzu 1fD0 WJ0 1wr0 Nb0 1Ap0 On0 1zd0 On0 1wp0 TX0 1tB0 TX0 1tB0 TX0 1tB0 WL0 1qN0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1qN0 WL0 1qN0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1qN0 WL0 1qN0 4kM0 8x40 iv0 1o10 11z0 1nX0 11z0 1o10 11z0 1o10 1qL0 11D0 1nX0 11B0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1qN0 11z0 1o10 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|65e5",
+		"America/Nassau|LMT EST EDT|59.u 50 40|012121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121|-2kNuO.u 26XdO.u 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|24e4",
+		"America/New_York|EST EDT EWT EPT|50 40 40 40|01010101010101010101010101010101010101010101010102301010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010|-261t0 1nX0 11B0 1nX0 11B0 1qL0 1a10 11z0 1qN0 WL0 1qN0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1qN0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1qN0 WL0 1qN0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1qN0 WL0 1qN0 11z0 1o10 11z0 RB0 8x40 iv0 1o10 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1qN0 WL0 1qN0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1o10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 s10 1Vz0 LB0 1BX0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|21e6",
+		"America/Nipigon|EST EDT EWT EPT|50 40 40 40|010123010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010|-25TR0 1in0 Rnb0 3je0 8x40 iv0 19yN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|16e2",
+		"America/Nome|NST NWT NPT BST BDT YST AKST AKDT|b0 a0 a0 b0 a0 90 90 80|012034343434343434343434343434343456767676767676767676767676767676767676767676767676767676767676767676767676767676767676767676767676767676767676|-17SX0 8wW0 iB0 Qlb0 52O0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 s10 1Vz0 LB0 1BX0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 cl0 10q0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|38e2",
+		"America/Noronha|LMT -02 -01|29.E 20 10|0121212121212121212121212121212121212121|-2glxO.k HdKO.k 1cc0 1e10 1bX0 Ezd0 So0 1vA0 Mn0 1BB0 ML0 1BB0 zX0 qe10 xb0 2ep0 nz0 1C10 zX0 1C10 LX0 1C10 Mn0 H210 Rb0 1tB0 IL0 1Fd0 FX0 1EN0 FX0 1HB0 Lz0 nsp0 WL0 1tB0 2L0 2pB0 On0|30e2",
+		"America/North_Dakota/Beulah|MST MDT MWT MPT CST CDT|70 60 60 60 60 50|010102301010101010101010101010101010101010101010101010101010101010101010101010101010101010101014545454545454545454545454545454545454545454545454545454|-261r0 1nX0 11B0 1nX0 SgN0 8x20 ix0 QwN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 s10 1Vz0 LB0 1BX0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Oo0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|",
+		"America/North_Dakota/Center|MST MDT MWT MPT CST CDT|70 60 60 60 60 50|010102301010101010101010101010101010101010101010101010101014545454545454545454545454545454545454545454545454545454545454545454545454545454545454545454|-261r0 1nX0 11B0 1nX0 SgN0 8x20 ix0 QwN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 s10 1Vz0 LB0 1BX0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14o0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|",
+		"America/North_Dakota/New_Salem|MST MDT MWT MPT CST CDT|70 60 60 60 60 50|010102301010101010101010101010101010101010101010101010101010101010101010101010101454545454545454545454545454545454545454545454545454545454545454545454|-261r0 1nX0 11B0 1nX0 SgN0 8x20 ix0 QwN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 s10 1Vz0 LB0 1BX0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14o0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|",
+		"America/Ojinaga|LMT MST CST CDT MDT|6V.E 70 60 50 60|0121212323241414141414141414141414141414141414141414141414141414141414141414141414141414141|-1UQF0 deL0 8lc0 17c0 10M0 1dd0 2zQN0 1lb0 14p0 1lb0 14q0 1lb0 14p0 1nX0 11B0 1nX0 1fB0 WL0 1fB0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 U10 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|23e3",
+		"America/Pangnirtung|-00 AST AWT APT ADDT ADT EDT EST CST CDT|0 40 30 30 20 30 40 50 60 50|012314151515151515151515151515151515167676767689767676767676767676767676767676767676767676767676767676767676767676767676767|-1XiM0 PnG0 8x50 iu0 LCL0 1fA0 zgO0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1o00 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11C0 1nX0 11A0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|14e2",
+		"America/Paramaribo|LMT PMT PMT -0330 -03|3E.E 3E.Q 3E.A 3u 30|01234|-2nDUj.k Wqo0.c qanX.I 1yVXN.o|24e4",
+		"America/Phoenix|MST MDT MWT|70 60 60|01010202010|-261r0 1nX0 11B0 1nX0 SgN0 4Al1 Ap0 1db0 SWqX 1cL0|42e5",
+		"America/Port-au-Prince|PPMT EST EDT|4N 50 40|01212121212121212121212121212121212121212121212121212121212121212121212121212121212121|-28RHb 2FnMb 19X0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14q0 1o00 11A0 1o00 11A0 1o00 14o0 1lc0 14o0 1lc0 14o0 1o00 11A0 1o00 11A0 1o00 14o0 1lc0 14o0 1lc0 i6n0 1nX0 11B0 1nX0 d430 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 3iN0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|23e5",
+		"America/Rio_Branco|LMT -05 -04|4v.c 50 40|01212121212121212121212121212121|-2glvs.M HdLs.M 1cc0 1e10 1bX0 Ezd0 So0 1vA0 Mn0 1BB0 ML0 1BB0 zX0 qe10 xb0 2ep0 nz0 1C10 zX0 1C10 LX0 1C10 Mn0 H210 Rb0 1tB0 IL0 1Fd0 FX0 NBd0 d5X0|31e4",
+		"America/Porto_Velho|LMT -04 -03|4f.A 40 30|012121212121212121212121212121|-2glvI.o HdKI.o 1cc0 1e10 1bX0 Ezd0 So0 1vA0 Mn0 1BB0 ML0 1BB0 zX0 qe10 xb0 2ep0 nz0 1C10 zX0 1C10 LX0 1C10 Mn0 H210 Rb0 1tB0 IL0 1Fd0 FX0|37e4",
+		"America/Puerto_Rico|AST AWT APT|40 30 30|0120|-17lU0 7XT0 iu0|24e5",
+		"America/Punta_Arenas|SMT -05 -04 -03|4G.K 50 40 30|0102021212121212121232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323|-2q2jh.e fJAh.e 5knG.K 1Vzh.e jRAG.K 1pbh.e 11d0 1oL0 11d0 1oL0 11d0 1oL0 11d0 1pb0 11d0 nHX0 op0 blz0 ko0 Qeo0 WL0 1zd0 On0 1ip0 11z0 1o10 11z0 1qN0 WL0 1ld0 14n0 1qN0 WL0 1qN0 11z0 1o10 11z0 1o10 11z0 1qN0 WL0 1qN0 WL0 1qN0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1qN0 WL0 1qN0 WL0 1qN0 1cL0 1cN0 11z0 1o10 11z0 1qN0 WL0 1fB0 19X0 1qN0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1qN0 WL0 1qN0 17b0 1ip0 11z0 1ip0 1fz0 1fB0 11z0 1qN0 WL0 1qN0 WL0 1qN0 WL0 1qN0 11z0 1o10 11z0 1o10 11z0 1qN0 WL0 1qN0 17b0 1ip0 11z0 1o10 19X0 1fB0 1nX0 G10 1EL0 Op0 1zb0 Rd0 1wn0 Rd0 46n0 Ap0|",
+		"America/Rainy_River|CST CDT CWT CPT|60 50 50 50|010123010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010|-25TQ0 1in0 Rnb0 3je0 8x30 iw0 19yN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|842",
+		"America/Rankin_Inlet|-00 CST CDDT CDT EST|0 60 40 50 50|012131313131313131313131313131313131313131313431313131313131313131313131313131313131313131313131313131313131313131313131|-vDc0 keu0 1fA0 zgO0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|26e2",
+		"America/Recife|LMT -03 -02|2j.A 30 20|0121212121212121212121212121212121212121|-2glxE.o HdLE.o 1cc0 1e10 1bX0 Ezd0 So0 1vA0 Mn0 1BB0 ML0 1BB0 zX0 qe10 xb0 2ep0 nz0 1C10 zX0 1C10 LX0 1C10 Mn0 H210 Rb0 1tB0 IL0 1Fd0 FX0 1EN0 FX0 1HB0 Lz0 nsp0 WL0 1tB0 2L0 2pB0 On0|33e5",
+		"America/Regina|LMT MST MDT MWT MPT CST|6W.A 70 60 60 60 60|012121212121212121212121341212121212121212121212121215|-2AD51.o uHe1.o 1in0 s2L0 11z0 1o10 11z0 1o10 11z0 1qN0 WL0 1qN0 11z0 66N0 1cL0 1cN0 19X0 1fB0 1cL0 1fB0 1cL0 1cN0 1cL0 M30 8x20 ix0 1ip0 1cL0 1ip0 11z0 1o10 11z0 1o10 11z0 1qN0 WL0 1qN0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1qN0 11z0 1o10 11z0 3NB0 1cL0 1cN0|19e4",
+		"America/Resolute|-00 CST CDDT CDT EST|0 60 40 50 50|012131313131313131313131313131313131313131313431313131313431313131313131313131313131313131313131313131313131313131313131|-SnA0 GWS0 1fA0 zgO0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|229",
+		"America/Santarem|LMT -04 -03|3C.M 40 30|0121212121212121212121212121212|-2glwl.c HdLl.c 1cc0 1e10 1bX0 Ezd0 So0 1vA0 Mn0 1BB0 ML0 1BB0 zX0 qe10 xb0 2ep0 nz0 1C10 zX0 1C10 LX0 1C10 Mn0 H210 Rb0 1tB0 IL0 1Fd0 FX0 NBd0|21e4",
+		"America/Santiago|SMT -05 -04 -03|4G.K 50 40 30|010202121212121212321232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323|-2q2jh.e fJAh.e 5knG.K 1Vzh.e jRAG.K 1pbh.e 11d0 1oL0 11d0 1oL0 11d0 1oL0 11d0 1pb0 11d0 nHX0 op0 9Bz0 jb0 1oN0 ko0 Qeo0 WL0 1zd0 On0 1ip0 11z0 1o10 11z0 1qN0 WL0 1ld0 14n0 1qN0 WL0 1qN0 11z0 1o10 11z0 1o10 11z0 1qN0 WL0 1qN0 WL0 1qN0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1qN0 WL0 1qN0 WL0 1qN0 1cL0 1cN0 11z0 1o10 11z0 1qN0 WL0 1fB0 19X0 1qN0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1qN0 WL0 1qN0 17b0 1ip0 11z0 1ip0 1fz0 1fB0 11z0 1qN0 WL0 1qN0 WL0 1qN0 WL0 1qN0 11z0 1o10 11z0 1o10 11z0 1qN0 WL0 1qN0 17b0 1ip0 11z0 1o10 19X0 1fB0 1nX0 G10 1EL0 Op0 1zb0 Rd0 1wn0 Rd0 46n0 Ap0 1Nb0 Ap0 1Nb0 Ap0 1zb0 11B0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1qL0 11B0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1qL0 WN0 1qL0 11B0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1qL0 WN0 1qL0 11B0 1nX0 11B0|62e5",
+		"America/Santo_Domingo|SDMT EST EDT -0430 AST|4E 50 40 4u 40|01213131313131414|-1ttjk 1lJMk Mn0 6sp0 Lbu 1Cou yLu 1RAu wLu 1QMu xzu 1Q0u xXu 1PAu 13jB0 e00|29e5",
+		"America/Sao_Paulo|LMT -03 -02|36.s 30 20|01212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121|-2glwR.w HdKR.w 1cc0 1e10 1bX0 Ezd0 So0 1vA0 Mn0 1BB0 ML0 1BB0 zX0 pTd0 PX0 2ep0 nz0 1C10 zX0 1C10 LX0 1C10 Mn0 H210 Rb0 1tB0 IL0 1Fd0 FX0 1EN0 FX0 1HB0 Lz0 1EN0 Lz0 1C10 IL0 1HB0 Db0 1HB0 On0 1zd0 On0 1zd0 Lz0 1zd0 Rb0 1wN0 Wn0 1tB0 Rb0 1tB0 WL0 1tB0 Rb0 1zd0 On0 1HB0 FX0 1C10 Lz0 1Ip0 HX0 1zd0 On0 1HB0 IL0 1wp0 On0 1C10 Lz0 1C10 On0 1zd0 On0 1zd0 Rb0 1zd0 Lz0 1C10 Lz0 1C10 On0 1zd0 On0 1zd0 On0 1zd0 On0 1HB0 FX0|20e6",
+		"America/Scoresbysund|LMT -02 -01 +00|1r.Q 20 10 0|0121323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232|-2a5Ww.8 2z5ew.8 1a00 1cK0 1cL0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|452",
+		"America/Sitka|PST PWT PPT PDT YST AKST AKDT|80 70 70 70 90 90 80|01203030303030303030303030303030345656565656565656565656565656565656565656565656565656565656565656565656565656565656565656565656565656565656565|-17T20 8x10 iy0 Vo10 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 s10 1Vz0 LB0 1BX0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 co0 10q0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|90e2",
+		"America/St_Johns|NST NDT NST NDT NWT NPT NDDT|3u.Q 2u.Q 3u 2u 2u 2u 1u|01010101010101010101010101010101010102323232323232324523232323232323232323232323232323232323232323232323232323232323232323232323232323232326232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232|-28oit.8 14L0 1nB0 1in0 1gm0 Dz0 1JB0 1cL0 1cN0 1cL0 1fB0 19X0 1fB0 19X0 1fB0 19X0 1fB0 19X0 1fB0 1cL0 1cN0 1cL0 1fB0 19X0 1fB0 19X0 1fB0 19X0 1fB0 19X0 1fB0 1cL0 1fB0 19X0 1fB0 19X0 10O0 eKX.8 19X0 1iq0 WL0 1qN0 WL0 1qN0 WL0 1tB0 TX0 1tB0 WL0 1qN0 WL0 1qN0 7UHu itu 1tB0 WL0 1qN0 WL0 1qN0 WL0 1qN0 WL0 1tB0 WL0 1ld0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1qN0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1o10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14n1 1lb0 14p0 1nW0 11C0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zcX Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|11e4",
+		"America/Swift_Current|LMT MST MDT MWT MPT CST|7b.k 70 60 60 60 60|012134121212121212121215|-2AD4M.E uHdM.E 1in0 UGp0 8x20 ix0 1o10 17b0 1ip0 11z0 1o10 11z0 1o10 11z0 isN0 1cL0 3Cp0 1cL0 1cN0 11z0 1qN0 WL0 pMp0|16e3",
+		"America/Tegucigalpa|LMT CST CDT|5M.Q 60 50|01212121|-1WGGb.8 2ETcb.8 WL0 1qN0 WL0 GRd0 AL0|11e5",
+		"America/Thule|LMT AST ADT|4z.8 40 30|012121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121|-2a5To.Q 31NBo.Q 1cL0 1cN0 1cL0 1fB0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|656",
+		"America/Thunder_Bay|CST EST EWT EPT EDT|60 50 40 40 40|0123141414141414141414141414141414141414141414141414141414141414141414141414141414141414141414141414141414141414141414141414141414141414141|-2q5S0 1iaN0 8x40 iv0 XNB0 1cL0 1cN0 1fz0 1cN0 1cL0 3Cp0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|11e4",
+		"America/Vancouver|PST PDT PWT PPT|80 70 70 70|0102301010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010|-25TO0 1in0 UGp0 8x10 iy0 1o10 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1qN0 WL0 1qN0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1qN0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1qN0 WL0 1qN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|23e5",
+		"America/Whitehorse|YST YDT YWT YPT YDDT PST PDT MST|90 80 80 80 70 80 70 70|01010230405656565656565656565656565656565656565656565656565656565656565656565656565656565657|-25TN0 1in0 1o10 13V0 Ser0 8x00 iz0 LCL0 1fA0 3NA0 vrd0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0|23e3",
+		"America/Winnipeg|CST CDT CWT CPT|60 50 50 50|010101023010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010|-2aIi0 WL0 3ND0 1in0 Jap0 Rb0 aCN0 8x30 iw0 1tB0 11z0 1ip0 11z0 1o10 11z0 1o10 11z0 1rd0 10L0 1op0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1qN0 11z0 1o10 11z0 1o10 11z0 1o10 1cL0 1cN0 11z0 6i10 WL0 6i10 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1a00 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1a00 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 14o0 1lc0 14o0 1o00 11A0 1o00 11A0 1o00 14o0 1lc0 14o0 1lc0 14o0 1o00 11A0 1o00 11A0 1o00 14o0 1lc0 14o0 1lc0 14o0 1lc0 14o0 1o00 11A0 1o00 11A0 1o00 14o0 1lc0 14o0 1lc0 14o0 1o00 11A0 1o00 11A0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|66e4",
+		"America/Yakutat|YST YWT YPT YDT AKST AKDT|90 80 80 80 90 80|01203030303030303030303030303030304545454545454545454545454545454545454545454545454545454545454545454545454545454545454545454545454545454545454|-17T10 8x00 iz0 Vo10 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 s10 1Vz0 LB0 1BX0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 cn0 10q0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|642",
+		"America/Yellowknife|-00 MST MWT MPT MDDT MDT|0 70 60 60 50 60|012314151515151515151515151515151515151515151515151515151515151515151515151515151515151515151515151515151515151515151515151|-1pdA0 hix0 8x20 ix0 LCL0 1fA0 zgO0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|19e3",
+		"Antarctica/Casey|-00 +08 +11|0 -80 -b0|01212121|-2q00 1DjS0 T90 40P0 KL0 blz0 3m10|10",
+		"Antarctica/Davis|-00 +07 +05|0 -70 -50|01012121|-vyo0 iXt0 alj0 1D7v0 VB0 3Wn0 KN0|70",
+		"Antarctica/DumontDUrville|-00 +10|0 -a0|0101|-U0o0 cfq0 bFm0|80",
+		"Antarctica/Macquarie|AEST AEDT -00 +11|-a0 -b0 0 -b0|0102010101010101010101010101010101010101010101010101010101010101010101010101010101010101013|-29E80 19X0 4SL0 1ayy0 Lvs0 1cM0 1o00 Rc0 1wo0 Rc0 1wo0 U00 1wo0 LA0 1C00 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Rc0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 11A0 1qM0 WM0 1qM0 Oo0 1zc0 Oo0 1zc0 Oo0 1wo0 WM0 1tA0 WM0 1tA0 U00 1tA0 U00 1tA0 11A0 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1cM0 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 11A0 1o00 1io0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1cM0 1cM0 1a00 1io0 1cM0 1cM0 1cM0 1cM0 1cM0|1",
+		"Antarctica/Mawson|-00 +06 +05|0 -60 -50|012|-CEo0 2fyk0|60",
+		"Pacific/Auckland|NZMT NZST NZST NZDT|-bu -cu -c0 -d0|01020202020202020202020202023232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323|-1GCVu Lz0 1tB0 11zu 1o0u 11zu 1o0u 11zu 1o0u 14nu 1lcu 14nu 1lcu 1lbu 11Au 1nXu 11Au 1nXu 11Au 1nXu 11Au 1nXu 11Au 1qLu WMu 1qLu 11Au 1n1bu IM0 1C00 Rc0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Rc0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Rc0 1zc0 Oo0 1qM0 14o0 1lc0 14o0 1lc0 14o0 1lc0 17c0 1io0 17c0 1io0 17c0 1io0 17c0 1lc0 14o0 1lc0 14o0 1lc0 17c0 1io0 17c0 1io0 17c0 1lc0 14o0 1lc0 14o0 1lc0 17c0 1io0 17c0 1io0 17c0 1io0 17c0 1io0 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1cM0 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1cM0 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1io0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1cM0 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1cM0 1fA0 1a00 1fA0 1a00|14e5",
+		"Antarctica/Palmer|-00 -03 -04 -02|0 30 40 20|0121212121213121212121212121212121212121212121212121212121212121212121212121212121|-cao0 nD0 1vd0 SL0 1vd0 17z0 1cN0 1fz0 1cN0 1cL0 1cN0 asn0 Db0 jsN0 14N0 11z0 1o10 11z0 1qN0 WL0 1qN0 WL0 1qN0 1cL0 1cN0 11z0 1o10 11z0 1qN0 WL0 1fB0 19X0 1qN0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1qN0 WL0 1qN0 17b0 1ip0 11z0 1ip0 1fz0 1fB0 11z0 1qN0 WL0 1qN0 WL0 1qN0 WL0 1qN0 11z0 1o10 11z0 1o10 11z0 1qN0 WL0 1qN0 17b0 1ip0 11z0 1o10 19X0 1fB0 1nX0 G10 1EL0 Op0 1zb0 Rd0 1wn0 Rd0 46n0 Ap0|40",
+		"Antarctica/Rothera|-00 -03|0 30|01|gOo0|130",
+		"Antarctica/Syowa|-00 +03|0 -30|01|-vs00|20",
+		"Antarctica/Troll|-00 +00 +02|0 0 -20|01212121212121212121212121212121212121212121212121212121212121212121|1puo0 hd0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|40",
+		"Antarctica/Vostok|-00 +06|0 -60|01|-tjA0|25",
+		"Europe/Oslo|CET CEST|-10 -20|010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010|-2awM0 Qm0 W6o0 5pf0 WM0 1fA0 1cM0 1cM0 1cM0 1cM0 wJc0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1qM0 WM0 zpc0 1a00 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|62e4",
+		"Asia/Riyadh|LMT +03|-36.Q -30|01|-TvD6.Q|57e5",
+		"Asia/Almaty|LMT +05 +06 +07|-57.M -50 -60 -70|012323232323232323232321232323232323232323232323232|-1Pc57.M eUo7.M 23CL0 1db0 1cN0 1db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 2pB0 IM0 rX0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0|15e5",
+		"Asia/Amman|LMT EET EEST|-2n.I -20 -30|0121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121|-1yW2n.I 1HiMn.I KL0 1oN0 11b0 1oN0 11b0 1pd0 1dz0 1cp0 11b0 1op0 11b0 fO10 1db0 1e10 1cL0 1cN0 1cL0 1cN0 1fz0 1pd0 10n0 1ld0 14n0 1hB0 15b0 1ip0 19X0 1cN0 1cL0 1cN0 17b0 1ld0 14o0 1lc0 17c0 1io0 17c0 1io0 17c0 1So0 y00 1fc0 1dc0 1co0 1dc0 1cM0 1cM0 1cM0 1o00 11A0 1lc0 17c0 1cM0 1cM0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 4bX0 Dd0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0|25e5",
+		"Asia/Anadyr|LMT +12 +13 +14 +11|-bN.U -c0 -d0 -e0 -b0|01232121212121212121214121212121212121212121212121212121212141|-1PcbN.U eUnN.U 23CL0 1db0 2q10 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 2pB0 IM0 rX0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 2sp0 WM0|13e3",
+		"Asia/Aqtau|LMT +04 +05 +06|-3l.4 -40 -50 -60|012323232323232323232123232312121212121212121212|-1Pc3l.4 eUnl.4 24PX0 2pX0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 2pB0 IM0 rX0 1cM0 1cM0 1cM0 1cM0 1cM0 1cN0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0|15e4",
+		"Asia/Aqtobe|LMT +04 +05 +06|-3M.E -40 -50 -60|0123232323232323232321232323232323232323232323232|-1Pc3M.E eUnM.E 23CL0 3Db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 2pB0 IM0 rX0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0|27e4",
+		"Asia/Ashgabat|LMT +04 +05 +06|-3R.w -40 -50 -60|0123232323232323232323212|-1Pc3R.w eUnR.w 23CL0 1db0 1cN0 1db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 2pB0 IM0|41e4",
+		"Asia/Atyrau|LMT +03 +05 +06 +04|-3r.I -30 -50 -60 -40|01232323232323232323242323232323232324242424242|-1Pc3r.I eUor.I 24PW0 2pX0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 2pB0 IM0 rX0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 2sp0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0|",
+		"Asia/Baghdad|BMT +03 +04|-2V.A -30 -40|012121212121212121212121212121212121212121212121212121|-26BeV.A 2ACnV.A 11b0 1cp0 1dz0 1dd0 1db0 1cN0 1cp0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1de0 1dc0 1dc0 1dc0 1cM0 1dc0 1cM0 1dc0 1cM0 1dc0 1dc0 1dc0 1cM0 1dc0 1cM0 1dc0 1cM0 1dc0 1dc0 1dc0 1cM0 1dc0 1cM0 1dc0 1cM0 1dc0 1dc0 1dc0 1cM0 1dc0 1cM0 1dc0 1cM0 1dc0|66e5",
+		"Asia/Qatar|LMT +04 +03|-3q.8 -40 -30|012|-21Jfq.8 27BXq.8|96e4",
+		"Asia/Baku|LMT +03 +04 +05|-3j.o -30 -40 -50|01232323232323232323232123232323232323232323232323232323232323232|-1Pc3j.o 1jUoj.o WCL0 1db0 1cN0 1db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 2pB0 1cM0 9Je0 1o00 11z0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00|27e5",
+		"Asia/Bangkok|BMT +07|-6G.4 -70|01|-218SG.4|15e6",
+		"Asia/Barnaul|LMT +06 +07 +08|-5z -60 -70 -80|0123232323232323232323212323232321212121212121212121212121212121212|-21S5z pCnz 23CL0 1db0 1cN0 1db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 2pB0 IM0 rX0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 p90 LE0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 8Hz0 3rd0|",
+		"Asia/Beirut|EET EEST|-20 -30|010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010|-21aq0 1on0 1410 1db0 19B0 1in0 1ip0 WL0 1lQp0 11b0 1oN0 11b0 1oN0 11b0 1pd0 11b0 1oN0 11b0 q6N0 En0 1oN0 11b0 1oN0 11b0 1oN0 11b0 1pd0 11b0 1oN0 11b0 1op0 11b0 dA10 17b0 1iN0 17b0 1iN0 17b0 1iN0 17b0 1vB0 SL0 1mp0 13z0 1iN0 17b0 1iN0 17b0 1jd0 12n0 1a10 1cL0 1cN0 1cL0 1cN0 1cL0 1fB0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1qL0 WN0 1qL0 WN0 1qL0 11B0 1nX0 11B0 1nX0 11B0 1qL0 WN0 1qL0 WN0 1qL0 WN0 1qL0 11B0 1nX0 11B0 1nX0 11B0 1qL0 WN0 1qL0 WN0 1qL0 11B0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1qL0 WN0 1qL0 WN0 1qL0 11B0 1nX0 11B0 1nX0 11B0 1qL0 WN0 1qL0 WN0 1qL0 11B0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1qL0 WN0 1qL0 WN0 1qL0 11B0 1nX0 11B0 1nX0 11B0 1qL0 WN0 1qL0 WN0 1qL0 WN0 1qL0 11B0 1nX0 11B0 1nX0|22e5",
+		"Asia/Bishkek|LMT +05 +06 +07|-4W.o -50 -60 -70|012323232323232323232321212121212121212121212121212|-1Pc4W.o eUnW.o 23CL0 1db0 1cN0 1db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 2e00 1tX0 17b0 1ip0 17b0 1ip0 17b0 1ip0 17b0 1ip0 19X0 1cPu 1nX0 11B0 1nX0 11B0 1qL0 WN0 1qL0 WN0 1qL0 11B0 1nX0 11B0 1nX0 11B0 1qL0 WN0|87e4",
+		"Asia/Brunei|LMT +0730 +08|-7D.E -7u -80|012|-1KITD.E gDc9.E|42e4",
+		"Asia/Kolkata|MMT IST +0630|-5l.a -5u -6u|012121|-2zOtl.a 1r2LP.a 1un0 HB0 7zX0|15e6",
+		"Asia/Chita|LMT +08 +09 +10|-7x.Q -80 -90 -a0|012323232323232323232321232323232323232323232323232323232323232312|-21Q7x.Q pAnx.Q 23CL0 1db0 1cN0 1db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 2pB0 IM0 rX0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 8Hz0 3re0|33e4",
+		"Asia/Choibalsan|LMT +07 +08 +10 +09|-7C -70 -80 -a0 -90|0123434343434343434343434343434343434343434343424242|-2APHC 2UkoC cKn0 1da0 1dd0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1fB0 1cL0 1cN0 1cL0 1cN0 1cL0 6hD0 11z0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 3Db0 h1f0 1cJ0 1cP0 1cJ0|38e3",
+		"Asia/Shanghai|CST CDT|-80 -90|01010101010101010101010101010|-23uw0 18n0 OjB0 Rz0 11d0 1wL0 A10 8HX0 1G10 Tz0 1ip0 1jX0 1cN0 11b0 1oN0 aL0 1tU30 Rb0 1o10 11z0 1qN0 WL0 1qN0 11z0 1o10 11z0 1o10 11z0|23e6",
+		"Asia/Colombo|MMT +0530 +06 +0630|-5j.w -5u -60 -6u|01231321|-2zOtj.w 1rFbN.w 1zzu 7Apu 23dz0 11zu n3cu|22e5",
+		"Asia/Dhaka|HMT +0630 +0530 +06 +07|-5R.k -6u -5u -60 -70|0121343|-18LFR.k 1unn.k HB0 m6n0 2kxbu 1i00|16e6",
+		"Asia/Damascus|LMT EET EEST|-2p.c -20 -30|01212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121|-21Jep.c Hep.c 17b0 1ip0 17b0 1ip0 17b0 1ip0 19X0 1xRB0 11X0 1oN0 10L0 1pB0 11b0 1oN0 10L0 1mp0 13X0 1oN0 11b0 1pd0 11b0 1oN0 11b0 1oN0 11b0 1oN0 11b0 1pd0 11b0 1oN0 11b0 1oN0 11b0 1oN0 11b0 1pd0 11b0 1oN0 Nb0 1AN0 Nb0 bcp0 19X0 1gp0 19X0 3ld0 1xX0 Vd0 1Bz0 Sp0 1vX0 10p0 1dz0 1cN0 1cL0 1db0 1db0 1g10 1an0 1ap0 1db0 1fd0 1db0 1cN0 1db0 1dd0 1db0 1cp0 1dz0 1c10 1dX0 1cN0 1db0 1dd0 1db0 1cN0 1db0 1cN0 1db0 1cN0 1db0 1dd0 1db0 1cN0 1db0 1cN0 19z0 1fB0 1qL0 11B0 1on0 Wp0 1qL0 11B0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1qL0 WN0 1qL0 WN0 1qL0 11B0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1qL0 WN0 1qL0 WN0 1qL0 11B0 1nX0 11B0 1nX0 11B0 1qL0 WN0 1qL0 WN0 1qL0 11B0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1qL0 WN0 1qL0 WN0 1qL0 11B0 1nX0 11B0 1nX0 11B0 1qL0 WN0 1qL0|26e5",
+		"Asia/Dili|LMT +08 +09|-8m.k -80 -90|01212|-2le8m.k 1dnXm.k 1nfA0 Xld0|19e4",
+		"Asia/Dubai|LMT +04|-3F.c -40|01|-21JfF.c|39e5",
+		"Asia/Dushanbe|LMT +05 +06 +07|-4z.c -50 -60 -70|012323232323232323232321|-1Pc4z.c eUnz.c 23CL0 1db0 1cN0 1db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 2hB0|76e4",
+		"Asia/Famagusta|LMT EET EEST +03|-2f.M -20 -30 -30|0121212121212121212121212121212121212121212121212121212121212121212121212121212121212312121212121212121212121212121212121212121|-1Vc2f.M 2a3cf.M 1cL0 1qp0 Xz0 19B0 19X0 1fB0 1db0 1cp0 1cL0 1fB0 19X0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1fB0 1cL0 1cN0 1cL0 1cN0 1o30 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 15U0 2Ks0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|",
+		"Asia/Gaza|EET EEST IST IDT|-20 -30 -20 -30|0101010101010101010101010101010123232323232323232323232323232320101010101010101010101010101010101010101010101010101010101010101010101010101010101010|-1c2q0 5Rb0 10r0 1px0 10N0 1pz0 16p0 1jB0 16p0 1jx0 pBd0 Vz0 1oN0 11b0 1oO0 10N0 1pz0 10N0 1pb0 10N0 1pb0 10N0 1pb0 10N0 1pz0 10N0 1pb0 10N0 1pb0 11d0 1oL0 dW0 hfB0 Db0 1fB0 Rb0 bXd0 gM0 8Q00 IM0 1wM0 11z0 1C10 IL0 1s10 10n0 1o10 WL0 1zd0 On0 1ld0 11z0 1o10 14n0 1o10 14n0 1nd0 12n0 1nd0 Xz0 1q10 12n0 M10 C00 17c0 1io0 17c0 1io0 17c0 1o00 1cL0 1fB0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 17c0 1io0 18N0 1bz0 19z0 1gp0 1610 1iL0 11z0 1o10 14o0 1lA1 SKX 1xd1 MKX 1AN0 1a00 1fA0 1cL0 1cN0 1nX0 1210 1nz0 1220 1qL0 WN0 1qL0 WN0 1qL0 11c0 1oo0 11c0 1rc0 Wo0 1rc0 Wo0 1rc0 11c0 1oo0 11c0 1oo0 11c0 1oo0 11c0 1rc0 Wo0 1rc0 11c0 1oo0 11c0 1oo0 11c0 1oo0 11c0 1oo0 11c0 1rc0 Wo0 1rc0 11c0 1oo0 11c0 1oo0 11c0 1oo0 11c0 1rc0|18e5",
+		"Asia/Hebron|EET EEST IST IDT|-20 -30 -20 -30|010101010101010101010101010101012323232323232323232323232323232010101010101010101010101010101010101010101010101010101010101010101010101010101010101010|-1c2q0 5Rb0 10r0 1px0 10N0 1pz0 16p0 1jB0 16p0 1jx0 pBd0 Vz0 1oN0 11b0 1oO0 10N0 1pz0 10N0 1pb0 10N0 1pb0 10N0 1pb0 10N0 1pz0 10N0 1pb0 10N0 1pb0 11d0 1oL0 dW0 hfB0 Db0 1fB0 Rb0 bXd0 gM0 8Q00 IM0 1wM0 11z0 1C10 IL0 1s10 10n0 1o10 WL0 1zd0 On0 1ld0 11z0 1o10 14n0 1o10 14n0 1nd0 12n0 1nd0 Xz0 1q10 12n0 M10 C00 17c0 1io0 17c0 1io0 17c0 1o00 1cL0 1fB0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 17c0 1io0 18N0 1bz0 19z0 1gp0 1610 1iL0 12L0 1mN0 14o0 1lc0 Tb0 1xd1 MKX bB0 cn0 1cN0 1a00 1fA0 1cL0 1cN0 1nX0 1210 1nz0 1220 1qL0 WN0 1qL0 WN0 1qL0 11c0 1oo0 11c0 1rc0 Wo0 1rc0 Wo0 1rc0 11c0 1oo0 11c0 1oo0 11c0 1oo0 11c0 1rc0 Wo0 1rc0 11c0 1oo0 11c0 1oo0 11c0 1oo0 11c0 1oo0 11c0 1rc0 Wo0 1rc0 11c0 1oo0 11c0 1oo0 11c0 1oo0 11c0 1rc0|25e4",
+		"Asia/Ho_Chi_Minh|LMT PLMT +07 +08 +09|-76.E -76.u -70 -80 -90|0123423232|-2yC76.E bK00.a 1h7b6.u 5lz0 18o0 3Oq0 k5b0 aW00 BAM0|90e5",
+		"Asia/Hong_Kong|LMT HKT HKST HKWT JST|-7A.G -80 -90 -8u -90|0123412121212121212121212121212121212121212121212121212121212121212121|-2CFH0 1taO0 Hc0 xUu 9tBu 11z0 1tDu Rc0 1wo0 11A0 1cM0 11A0 1o00 11A0 1o00 11A0 1o00 14o0 1o00 11A0 1nX0 U10 1tz0 U10 1wn0 Rd0 1wn0 U10 1tz0 U10 1tz0 U10 1tz0 U10 1wn0 Rd0 1wn0 Rd0 1wn0 U10 1tz0 U10 1tz0 17d0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 s10 1Vz0 1cN0 1cL0 1cN0 1cL0 6fd0 14n0|73e5",
+		"Asia/Hovd|LMT +06 +07 +08|-66.A -60 -70 -80|012323232323232323232323232323232323232323232323232|-2APG6.A 2Uko6.A cKn0 1db0 1dd0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1fB0 1cL0 1cN0 1cL0 1cN0 1cL0 6hD0 11z0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 kEp0 1cJ0 1cP0 1cJ0|81e3",
+		"Asia/Irkutsk|IMT +07 +08 +09|-6V.5 -70 -80 -90|01232323232323232323232123232323232323232323232323232323232323232|-21zGV.5 pjXV.5 23CL0 1db0 1cN0 1db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 2pB0 IM0 rX0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 8Hz0|60e4",
+		"Europe/Istanbul|IMT EET EEST +03 +04|-1U.U -20 -30 -30 -40|0121212121212121212121212121212121212121212121234312121212121212121212121212121212121212121212121212121212121212123|-2ogNU.U dzzU.U 11b0 8tB0 1on0 1410 1db0 19B0 1in0 3Rd0 Un0 1oN0 11b0 zSN0 CL0 mp0 1Vz0 1gN0 8yn0 1yp0 ML0 1kp0 17b0 1ip0 17b0 1fB0 19X0 1ip0 19X0 1ip0 17b0 qdB0 38L0 1jd0 Tz0 l6O0 11A0 WN0 1qL0 TB0 1tX0 U10 1tz0 11B0 1in0 17d0 z90 cne0 pb0 2Cp0 1800 14o0 1dc0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1a00 1fA0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WO0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 Xc0 1qo0 WM0 1qM0 11A0 1o00 1200 1nA0 11A0 1tA0 U00 15w0|13e6",
+		"Asia/Jakarta|BMT +0720 +0730 +09 +08 WIB|-77.c -7k -7u -90 -80 -70|01232425|-1Q0Tk luM0 mPzO 8vWu 6kpu 4PXu xhcu|31e6",
+		"Asia/Jayapura|LMT +09 +0930 WIT|-9m.M -90 -9u -90|0123|-1uu9m.M sMMm.M L4nu|26e4",
+		"Asia/Jerusalem|JMT IST IDT IDDT|-2k.E -20 -30 -40|012121212121321212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121|-26Bek.E SyMk.E 5Rb0 10r0 1px0 10N0 1pz0 16p0 1jB0 16p0 1jx0 3LB0 Em0 or0 1cn0 1dB0 16n0 10O0 1ja0 1tC0 14o0 1cM0 1a00 11A0 1Na0 An0 1MP0 AJ0 1Kp0 LC0 1oo0 Wl0 EQN0 Db0 1fB0 Rb0 bXd0 gM0 8Q00 IM0 1wM0 11z0 1C10 IL0 1s10 10n0 1o10 WL0 1zd0 On0 1ld0 11z0 1o10 14n0 1o10 14n0 1nd0 12n0 1nd0 Xz0 1q10 12n0 1hB0 1dX0 1ep0 1aL0 1eN0 17X0 1nf0 11z0 1tB0 19W0 1e10 17b0 1ep0 1gL0 18N0 1fz0 1eN0 17b0 1gq0 1gn0 19d0 1dz0 1c10 17X0 1hB0 1gn0 19d0 1dz0 1c10 17X0 1kp0 1dz0 1c10 1aL0 1eN0 1oL0 10N0 1oL0 10N0 1oL0 10N0 1rz0 W10 1rz0 W10 1rz0 10N0 1oL0 10N0 1oL0 10N0 1rz0 W10 1rz0 W10 1rz0 10N0 1oL0 10N0 1oL0 10N0 1oL0 10N0 1rz0 W10 1rz0 W10 1rz0 10N0 1oL0 10N0 1oL0 10N0 1rz0 W10 1rz0 W10 1rz0 W10 1rz0 10N0 1oL0 10N0 1oL0|81e4",
+		"Asia/Kabul|+04 +0430|-40 -4u|01|-10Qs0|46e5",
+		"Asia/Kamchatka|LMT +11 +12 +13|-ay.A -b0 -c0 -d0|012323232323232323232321232323232323232323232323232323232323212|-1SLKy.A ivXy.A 23CL0 1db0 1cN0 1db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 2pB0 IM0 rX0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 2sp0 WM0|18e4",
+		"Asia/Karachi|LMT +0530 +0630 +05 PKT PKST|-4s.c -5u -6u -50 -50 -60|012134545454|-2xoss.c 1qOKW.c 7zX0 eup0 LqMu 1fy00 1cL0 dK10 11b0 1610 1jX0|24e6",
+		"Asia/Urumqi|LMT +06|-5O.k -60|01|-1GgtO.k|32e5",
+		"Asia/Kathmandu|LMT +0530 +0545|-5F.g -5u -5J|012|-21JhF.g 2EGMb.g|12e5",
+		"Asia/Khandyga|LMT +08 +09 +10 +11|-92.d -80 -90 -a0 -b0|0123232323232323232323212323232323232323232323232343434343434343432|-21Q92.d pAp2.d 23CL0 1db0 1cN0 1db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 2pB0 IM0 rX0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 qK0 yN0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 17V0 7zD0|66e2",
+		"Asia/Krasnoyarsk|LMT +06 +07 +08|-6b.q -60 -70 -80|01232323232323232323232123232323232323232323232323232323232323232|-21Hib.q prAb.q 23CL0 1db0 1cN0 1db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 2pB0 IM0 rX0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 8Hz0|10e5",
+		"Asia/Kuala_Lumpur|SMT +07 +0720 +0730 +09 +08|-6T.p -70 -7k -7u -90 -80|0123435|-2Bg6T.p 17anT.p l5XE 17bO 8Fyu 1so1u|71e5",
+		"Asia/Kuching|LMT +0730 +08 +0820 +09|-7l.k -7u -80 -8k -90|0123232323232323242|-1KITl.k gDbP.k 6ynu AnE 1O0k AnE 1NAk AnE 1NAk AnE 1NAk AnE 1O0k AnE 1NAk AnE pAk 8Fz0|13e4",
+		"Asia/Macau|LMT CST +09 +10 CDT|-7y.a -80 -90 -a0 -90|012323214141414141414141414141414141414141414141414141414141414141414141|-2CFHy.a 1uqKy.a PX0 1kn0 15B0 11b0 4Qq0 1oM0 11c0 1ko0 1u00 11A0 1cM0 11c0 1o00 11A0 1o00 11A0 1oo0 1400 1o00 11A0 1o00 U00 1tA0 U00 1wo0 Rc0 1wru U10 1tz0 U10 1tz0 U10 1tz0 U10 1wn0 Rd0 1wn0 Rd0 1wn0 U10 1tz0 U10 1tz0 17d0 1cK0 1cO0 1cK0 1cO0 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 s10 1Vz0 1cN0 1cL0 1cN0 1cL0 6fd0 14n0|57e4",
+		"Asia/Magadan|LMT +10 +11 +12|-a3.c -a0 -b0 -c0|012323232323232323232321232323232323232323232323232323232323232312|-1Pca3.c eUo3.c 23CL0 1db0 1cN0 1db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 2pB0 IM0 rX0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 8Hz0 3Cq0|95e3",
+		"Asia/Makassar|LMT MMT +08 +09 WITA|-7V.A -7V.A -80 -90 -80|01234|-21JjV.A vfc0 myLV.A 8ML0|15e5",
+		"Asia/Manila|PST PDT JST|-80 -90 -90|010201010|-1kJI0 AL0 cK10 65X0 mXB0 vX0 VK10 1db0|24e6",
+		"Asia/Nicosia|LMT EET EEST|-2d.s -20 -30|01212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121|-1Vc2d.s 2a3cd.s 1cL0 1qp0 Xz0 19B0 19X0 1fB0 1db0 1cp0 1cL0 1fB0 19X0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1fB0 1cL0 1cN0 1cL0 1cN0 1o30 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|32e4",
+		"Asia/Novokuznetsk|LMT +06 +07 +08|-5M.M -60 -70 -80|012323232323232323232321232323232323232323232323232323232323212|-1PctM.M eULM.M 23CL0 1db0 1cN0 1db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 2pB0 IM0 rX0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 2sp0 WM0|55e4",
+		"Asia/Novosibirsk|LMT +06 +07 +08|-5v.E -60 -70 -80|0123232323232323232323212323212121212121212121212121212121212121212|-21Qnv.E pAFv.E 23CL0 1db0 1cN0 1db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 2pB0 IM0 rX0 1cM0 1cM0 ml0 Os0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 8Hz0 4eN0|15e5",
+		"Asia/Omsk|LMT +05 +06 +07|-4R.u -50 -60 -70|01232323232323232323232123232323232323232323232323232323232323232|-224sR.u pMLR.u 23CL0 1db0 1cN0 1db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 2pB0 IM0 rX0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 8Hz0|12e5",
+		"Asia/Oral|LMT +03 +05 +06 +04|-3p.o -30 -50 -60 -40|01232323232323232424242424242424242424242424242|-1Pc3p.o eUop.o 23CK0 3Db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 2pB0 1cM0 1fA0 1cM0 1cM0 IM0 1EM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0|27e4",
+		"Asia/Pontianak|LMT PMT +0730 +09 +08 WITA WIB|-7h.k -7h.k -7u -90 -80 -80 -70|012324256|-2ua7h.k XE00 munL.k 8Rau 6kpu 4PXu xhcu Wqnu|23e4",
+		"Asia/Pyongyang|LMT KST JST KST|-8n -8u -90 -90|012313|-2um8n 97XR 1lTzu 2Onc0 6BA0|29e5",
+		"Asia/Qostanay|LMT +04 +05 +06|-4e.s -40 -50 -60|012323232323232323232123232323232323232323232323|-1Pc4e.s eUoe.s 23CL0 3Db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 2pB0 IM0 rX0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0|",
+		"Asia/Qyzylorda|LMT +04 +05 +06|-4l.Q -40 -50 -60|01232323232323232323232323232323232323232323232|-1Pc4l.Q eUol.Q 23CL0 3Db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 3ao0 1EM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 zQl0|73e4",
+		"Asia/Rangoon|RMT +0630 +09|-6o.L -6u -90|0121|-21Jio.L SmnS.L 7j9u|48e5",
+		"Asia/Sakhalin|LMT +09 +11 +12 +10|-9u.M -90 -b0 -c0 -a0|01232323232323232323232423232323232424242424242424242424242424242|-2AGVu.M 1BoMu.M 1qFa0 1db0 1cN0 1db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 2pB0 IM0 rX0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 2pB0 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 8Hz0 3rd0|58e4",
+		"Asia/Samarkand|LMT +04 +05 +06|-4r.R -40 -50 -60|01232323232323232323232|-1Pc4r.R eUor.R 23CL0 3Db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0|36e4",
+		"Asia/Seoul|LMT KST JST KST KDT KDT|-8r.Q -8u -90 -90 -a0 -9u|012343434343151515151515134343|-2um8r.Q 97XV.Q 1m1zu 6CM0 Fz0 1kN0 14n0 1kN0 14L0 1zd0 On0 69B0 2I0u OL0 1FB0 Rb0 1qN0 TX0 1tB0 TX0 1tB0 TX0 1tB0 TX0 2ap0 12FBu 11A0 1o00 11A0|23e6",
+		"Asia/Srednekolymsk|LMT +10 +11 +12|-ae.Q -a0 -b0 -c0|01232323232323232323232123232323232323232323232323232323232323232|-1Pcae.Q eUoe.Q 23CL0 1db0 1cN0 1db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 2pB0 IM0 rX0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 8Hz0|35e2",
+		"Asia/Taipei|CST JST CDT|-80 -90 -90|01020202020202020202020202020202020202020|-1iw80 joM0 1yo0 Tz0 1ip0 1jX0 1cN0 11b0 1oN0 11b0 1oN0 11b0 1oN0 11b0 10N0 1BX0 10p0 1pz0 10p0 1pz0 10p0 1db0 1dd0 1db0 1cN0 1db0 1cN0 1db0 1cN0 1db0 1BB0 ML0 1Bd0 ML0 uq10 1db0 1cN0 1db0 97B0 AL0|74e5",
+		"Asia/Tashkent|LMT +05 +06 +07|-4B.b -50 -60 -70|012323232323232323232321|-1Pc4B.b eUnB.b 23CL0 1db0 1cN0 1db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 2pB0|23e5",
+		"Asia/Tbilisi|TBMT +03 +04 +05|-2X.b -30 -40 -50|0123232323232323232323212121232323232323232323212|-1Pc2X.b 1jUnX.b WCL0 1db0 1cN0 1db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 2pB0 1cK0 1cL0 1cN0 1cL0 1cN0 2pz0 1cL0 1fB0 3Nz0 11B0 1nX0 11B0 1qL0 WN0 1qL0 WN0 1qL0 11B0 1nX0 11B0 1nX0 11B0 An0 Os0 WM0|11e5",
+		"Asia/Tehran|LMT TMT +0330 +04 +05 +0430|-3p.I -3p.I -3u -40 -50 -4u|01234325252525252525252525252525252525252525252525252525252525252525252525252525252525252525252525252|-2btDp.I 1d3c0 1huLT.I TXu 1pz0 sN0 vAu 1cL0 1dB0 1en0 pNB0 UL0 1cN0 1dz0 1cp0 1dz0 1cp0 1dz0 1cp0 1dz0 1cp0 1dz0 1cN0 1dz0 1cp0 1dz0 1cp0 1dz0 1cp0 1dz0 1cN0 1dz0 1cp0 1dz0 1cp0 1dz0 1cp0 1dz0 1cN0 1dz0 64p0 1dz0 1cN0 1dz0 1cp0 1dz0 1cp0 1dz0 1cp0 1dz0 1cN0 1dz0 1cp0 1dz0 1cp0 1dz0 1cp0 1dz0 1cN0 1dz0 1cp0 1dz0 1cp0 1dz0 1cp0 1dz0 1cN0 1dz0 1cp0 1dz0 1cp0 1dz0 1cp0 1dz0 1cN0 1dz0 1cp0 1dz0 1cp0 1dz0 1cp0 1dz0 1cp0 1dz0 1cN0 1dz0 1cp0 1dz0 1cp0 1dz0 1cp0 1dz0 1cN0 1dz0 1cp0 1dz0 1cp0 1dz0 1cp0 1dz0|14e6",
+		"Asia/Thimphu|LMT +0530 +06|-5W.A -5u -60|012|-Su5W.A 1BGMs.A|79e3",
+		"Asia/Tokyo|JST JDT|-90 -a0|010101010|-QJJ0 Rc0 1lc0 14o0 1zc0 Oo0 1zc0 Oo0|38e6",
+		"Asia/Tomsk|LMT +06 +07 +08|-5D.P -60 -70 -80|0123232323232323232323212323232323232323232323212121212121212121212|-21NhD.P pxzD.P 23CL0 1db0 1cN0 1db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 2pB0 IM0 rX0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 co0 1bB0 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 8Hz0 3Qp0|10e5",
+		"Asia/Ulaanbaatar|LMT +07 +08 +09|-77.w -70 -80 -90|012323232323232323232323232323232323232323232323232|-2APH7.w 2Uko7.w cKn0 1db0 1dd0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1fB0 1cL0 1cN0 1cL0 1cN0 1cL0 6hD0 11z0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 kEp0 1cJ0 1cP0 1cJ0|12e5",
+		"Asia/Ust-Nera|LMT +08 +09 +12 +11 +10|-9w.S -80 -90 -c0 -b0 -a0|012343434343434343434345434343434343434343434343434343434343434345|-21Q9w.S pApw.S 23CL0 1d90 1cN0 1db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 2pB0 IM0 rX0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 17V0 7zD0|65e2",
+		"Asia/Vladivostok|LMT +09 +10 +11|-8L.v -90 -a0 -b0|01232323232323232323232123232323232323232323232323232323232323232|-1SJIL.v itXL.v 23CL0 1db0 1cN0 1db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 2pB0 IM0 rX0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 8Hz0|60e4",
+		"Asia/Yakutsk|LMT +08 +09 +10|-8C.W -80 -90 -a0|01232323232323232323232123232323232323232323232323232323232323232|-21Q8C.W pAoC.W 23CL0 1db0 1cN0 1db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 2pB0 IM0 rX0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 8Hz0|28e4",
+		"Asia/Yekaterinburg|LMT PMT +04 +05 +06|-42.x -3J.5 -40 -50 -60|012343434343434343434343234343434343434343434343434343434343434343|-2ag42.x 7mQh.s qBvJ.5 23CL0 1db0 1cN0 1db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 2pB0 IM0 rX0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 8Hz0|14e5",
+		"Asia/Yerevan|LMT +03 +04 +05|-2W -30 -40 -50|0123232323232323232323212121212323232323232323232323232323232|-1Pc2W 1jUnW WCL0 1db0 1cN0 1db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 2pB0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 4RX0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0|13e5",
+		"Atlantic/Azores|HMT -02 -01 +00 WET|1S.w 20 10 0 0|01212121212121212121212121212121212121212121232123212321232121212121212121212121212121212121212121232323232323232323232323232323234323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232|-2ldW0 aPX0 Sp0 LX0 1vc0 Tc0 1uM0 SM0 1vc0 Tc0 1vc0 SM0 1vc0 6600 1co0 3E00 17c0 1fA0 1a00 1io0 1a00 1io0 17c0 3I00 17c0 1cM0 1cM0 3Fc0 1cM0 1a00 1fA0 1io0 17c0 1cM0 1cM0 1a00 1fA0 1io0 1qM0 Dc0 1tA0 1cM0 1dc0 1400 gL0 IM0 s10 U00 dX0 Rc0 pd0 Rc0 gL0 Oo0 pd0 Rc0 gL0 Oo0 pd0 14o0 1cM0 1cP0 1cM0 1cM0 1cM0 1cM0 1cM0 3Co0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 qIl0 1cM0 1fA0 1cM0 1cM0 1cN0 1cL0 1cN0 1cM0 1cM0 1cM0 1cM0 1cN0 1cL0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cL0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|25e4",
+		"Atlantic/Bermuda|LMT AST ADT|4j.i 40 30|0121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121|-1BnRE.G 1LTbE.G 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|65e3",
+		"Atlantic/Canary|LMT -01 WET WEST|11.A 10 0 -10|01232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232|-1UtaW.o XPAW.o 1lAK0 1a10 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|54e4",
+		"Atlantic/Cape_Verde|LMT -02 -01|1y.4 20 10|01212|-2ldW0 1eEo0 7zX0 1djf0|50e4",
+		"Atlantic/Faroe|LMT WET WEST|r.4 0 -10|01212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121|-2uSnw.U 2Wgow.U 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|49e3",
+		"Atlantic/Madeira|FMT -01 +00 +01 WET WEST|17.A 10 0 -10 0 -10|01212121212121212121212121212121212121212121232123212321232121212121212121212121212121212121212121454545454545454545454545454545454545454545454545454545454545454545454545454545454545454545454545454545454545454545454545454|-2ldX0 aPX0 Sp0 LX0 1vc0 Tc0 1uM0 SM0 1vc0 Tc0 1vc0 SM0 1vc0 6600 1co0 3E00 17c0 1fA0 1a00 1io0 1a00 1io0 17c0 3I00 17c0 1cM0 1cM0 3Fc0 1cM0 1a00 1fA0 1io0 17c0 1cM0 1cM0 1a00 1fA0 1io0 1qM0 Dc0 1tA0 1cM0 1dc0 1400 gL0 IM0 s10 U00 dX0 Rc0 pd0 Rc0 gL0 Oo0 pd0 Rc0 gL0 Oo0 pd0 14o0 1cM0 1cP0 1cM0 1cM0 1cM0 1cM0 1cM0 3Co0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 qIl0 1cM0 1fA0 1cM0 1cM0 1cN0 1cL0 1cN0 1cM0 1cM0 1cM0 1cM0 1cN0 1cL0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|27e4",
+		"Atlantic/Reykjavik|LMT -01 +00 GMT|1s 10 0 0|012121212121212121212121212121212121212121212121212121212121212121213|-2uWmw mfaw 1Bd0 ML0 1LB0 Cn0 1LB0 3fX0 C10 HrX0 1cO0 LB0 1EL0 LA0 1C00 Oo0 1wo0 Rc0 1wo0 Rc0 1wo0 Rc0 1zc0 Oo0 1zc0 14o0 1lc0 14o0 1lc0 14o0 1o00 11A0 1lc0 14o0 1o00 14o0 1lc0 14o0 1lc0 14o0 1lc0 14o0 1lc0 14o0 1o00 14o0 1lc0 14o0 1lc0 14o0 1lc0 14o0 1lc0 14o0 1lc0 14o0 1o00 14o0 1lc0 14o0 1lc0 14o0 1lc0 14o0 1lc0 14o0 1o00 14o0|12e4",
+		"Atlantic/South_Georgia|-02|20|0||30",
+		"Atlantic/Stanley|SMT -04 -03 -02|3P.o 40 30 20|012121212121212323212121212121212121212121212121212121212121212121212|-2kJw8.A 12bA8.A 19X0 1fB0 19X0 1ip0 19X0 1fB0 19X0 1fB0 19X0 1fB0 Cn0 1Cc10 WL0 1qL0 U10 1tz0 2mN0 WN0 1qL0 WN0 1qL0 WN0 1qL0 WN0 1tz0 U10 1tz0 WN0 1qL0 WN0 1qL0 WN0 1qL0 WN0 1qL0 WN0 1tz0 WN0 1qL0 WN0 1qL0 WN0 1qL0 WN0 1qL0 WN0 1qN0 U10 1wn0 Rd0 1wn0 U10 1tz0 U10 1tz0 U10 1tz0 U10 1tz0 U10 1wn0 U10 1tz0 U10 1tz0 U10|21e2",
+		"Australia/Sydney|AEST AEDT|-a0 -b0|0101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101|-293lX xcX 10jd0 yL0 1cN0 1cL0 1fB0 19X0 17c10 LA0 1C00 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Rc0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 14o0 1o00 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 U00 1qM0 WM0 1tA0 WM0 1tA0 U00 1tA0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Rc0 1zc0 Oo0 1zc0 Oo0 1zc0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 11A0 1o00 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 11A0 1o00 WM0 1qM0 14o0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0|40e5",
+		"Australia/Adelaide|ACST ACDT|-9u -au|0101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101|-293lt xcX 10jd0 yL0 1cN0 1cL0 1fB0 19X0 17c10 LA0 1C00 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Rc0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Rc0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 U00 1qM0 WM0 1tA0 WM0 1tA0 U00 1tA0 U00 1tA0 Oo0 1zc0 WM0 1qM0 Rc0 1zc0 U00 1tA0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 11A0 1o00 WM0 1qM0 14o0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0|11e5",
+		"Australia/Brisbane|AEST AEDT|-a0 -b0|01010101010101010|-293lX xcX 10jd0 yL0 1cN0 1cL0 1fB0 19X0 17c10 LA0 H1A0 Oo0 1zc0 Oo0 1zc0 Oo0|20e5",
+		"Australia/Broken_Hill|ACST ACDT|-9u -au|0101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101|-293lt xcX 10jd0 yL0 1cN0 1cL0 1fB0 19X0 17c10 LA0 1C00 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Rc0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 14o0 1o00 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 U00 1qM0 WM0 1tA0 WM0 1tA0 U00 1tA0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Rc0 1zc0 Oo0 1zc0 Oo0 1zc0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 11A0 1o00 WM0 1qM0 14o0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0|18e3",
+		"Australia/Currie|AEST AEDT|-a0 -b0|0101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101|-29E80 19X0 10jd0 yL0 1cN0 1cL0 1fB0 19X0 17c10 LA0 1C00 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Rc0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 11A0 1qM0 WM0 1qM0 Oo0 1zc0 Oo0 1zc0 Oo0 1wo0 WM0 1tA0 WM0 1tA0 U00 1tA0 U00 1tA0 11A0 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1cM0 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 11A0 1o00 1io0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1cM0 1cM0 1a00 1io0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0|746",
+		"Australia/Darwin|ACST ACDT|-9u -au|010101010|-293lt xcX 10jd0 yL0 1cN0 1cL0 1fB0 19X0|12e4",
+		"Australia/Eucla|+0845 +0945|-8J -9J|0101010101010101010|-293kI xcX 10jd0 yL0 1cN0 1cL0 1gSp0 Oo0 l5A0 Oo0 iJA0 G00 zU00 IM0 1qM0 11A0 1o00 11A0|368",
+		"Australia/Hobart|AEST AEDT|-a0 -b0|010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101|-29E80 19X0 10jd0 yL0 1cN0 1cL0 1fB0 19X0 VfB0 1cM0 1o00 Rc0 1wo0 Rc0 1wo0 U00 1wo0 LA0 1C00 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Rc0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 11A0 1qM0 WM0 1qM0 Oo0 1zc0 Oo0 1zc0 Oo0 1wo0 WM0 1tA0 WM0 1tA0 U00 1tA0 U00 1tA0 11A0 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1cM0 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 11A0 1o00 1io0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1cM0 1cM0 1a00 1io0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0|21e4",
+		"Australia/Lord_Howe|AEST +1030 +1130 +11|-a0 -au -bu -b0|0121212121313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313|raC0 1zdu Rb0 1zd0 On0 1zd0 On0 1zd0 On0 1zd0 TXu 1qMu WLu 1tAu WLu 1tAu TXu 1tAu Onu 1zcu Onu 1zcu Onu 1zcu Rbu 1zcu Onu 1zcu Onu 1zcu 11zu 1o0u 11zu 1o0u 11zu 1o0u 11zu 1qMu WLu 11Au 1nXu 1qMu 11zu 1o0u 11zu 1o0u 11zu 1qMu WLu 1qMu 11zu 1o0u WLu 1qMu 14nu 1cMu 1cLu 1cMu 1cLu 1cMu 1cLu 1cMu 1cLu 1fAu 1cLu 1cMu 1cLu 1cMu 1cLu 1cMu 1cLu 1cMu 1cLu 1cMu 1cLu 1fAu 1cLu 1cMu 1cLu 1cMu 1cLu 1cMu 1cLu 1cMu 1cLu 1cMu 1fzu 1cMu 1cLu 1cMu 1cLu 1cMu 1cLu 1cMu 1cLu 1cMu 1cLu 1fAu 1cLu 1cMu 1cLu 1cMu 1cLu 1cMu 1cLu 1cMu 1cLu 1cMu 1cLu 1fAu 1cLu 1cMu 1cLu 1cMu|347",
+		"Australia/Lindeman|AEST AEDT|-a0 -b0|010101010101010101010|-293lX xcX 10jd0 yL0 1cN0 1cL0 1fB0 19X0 17c10 LA0 H1A0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Rc0 1zc0 Oo0|10",
+		"Australia/Melbourne|AEST AEDT|-a0 -b0|0101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101|-293lX xcX 10jd0 yL0 1cN0 1cL0 1fB0 19X0 17c10 LA0 1C00 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Rc0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Rc0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 U00 1qM0 WM0 1qM0 11A0 1tA0 U00 1tA0 U00 1tA0 Oo0 1zc0 Oo0 1zc0 Rc0 1zc0 Oo0 1zc0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 11A0 1o00 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 11A0 1o00 WM0 1qM0 14o0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0|39e5",
+		"Australia/Perth|AWST AWDT|-80 -90|0101010101010101010|-293jX xcX 10jd0 yL0 1cN0 1cL0 1gSp0 Oo0 l5A0 Oo0 iJA0 G00 zU00 IM0 1qM0 11A0 1o00 11A0|18e5",
+		"CET|CET CEST|-10 -20|01010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010|-2aFe0 11d0 1iO0 11A0 1o00 11A0 Qrc0 6i00 WM0 1fA0 1cM0 1cM0 1cM0 16M0 1gMM0 1a00 1fA0 1cM0 1cM0 1cM0 1fA0 1a00 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|",
+		"Pacific/Easter|EMT -07 -06 -05|7h.s 70 60 50|012121212121212121212121212123232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323|-1uSgG.w 1s4IG.w WL0 1zd0 On0 1ip0 11z0 1o10 11z0 1qN0 WL0 1ld0 14n0 1qN0 WL0 1qN0 11z0 1o10 11z0 1o10 11z0 1qN0 WL0 1qN0 WL0 1qN0 11z0 1o10 2pA0 11z0 1o10 11z0 1qN0 WL0 1qN0 WL0 1qN0 1cL0 1cN0 11z0 1o10 11z0 1qN0 WL0 1fB0 19X0 1qN0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1qN0 WL0 1qN0 17b0 1ip0 11z0 1ip0 1fz0 1fB0 11z0 1qN0 WL0 1qN0 WL0 1qN0 WL0 1qN0 11z0 1o10 11z0 1o10 11z0 1qN0 WL0 1qN0 17b0 1ip0 11z0 1o10 19X0 1fB0 1nX0 G10 1EL0 Op0 1zb0 Rd0 1wn0 Rd0 46n0 Ap0 1Nb0 Ap0 1Nb0 Ap0 1zb0 11B0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1qL0 11B0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1qL0 WN0 1qL0 11B0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1nX0 11B0 1qL0 WN0 1qL0 11B0 1nX0 11B0|30e2",
+		"CST6CDT|CST CDT CWT CPT|60 50 50 50|010102301010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010|-261s0 1nX0 11B0 1nX0 SgN0 8x30 iw0 QwN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 s10 1Vz0 LB0 1BX0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|",
+		"EET|EET EEST|-20 -30|010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010|hDB0 1a00 1fA0 1cM0 1cM0 1cM0 1fA0 1a00 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|",
+		"Europe/Dublin|DMT IST GMT BST IST|p.l -y.D 0 -10 -10|01232323232324242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242|-2ax9y.D Rc0 1fzy.D 14M0 1fc0 1g00 1co0 1dc0 1co0 1oo0 1400 1dc0 19A0 1io0 1io0 WM0 1o00 14o0 1o00 17c0 1io0 17c0 1fA0 1a00 1lc0 17c0 1io0 17c0 1fA0 1a00 1io0 17c0 1io0 17c0 1fA0 1cM0 1io0 17c0 1fA0 1a00 1io0 17c0 1io0 17c0 1fA0 1a00 1io0 1qM0 Dc0 g600 14o0 1wo0 17c0 1io0 11A0 1o00 17c0 1fA0 1a00 1fA0 1cM0 1fA0 1a00 17c0 1fA0 1a00 1io0 17c0 1lc0 17c0 1fA0 1a00 1io0 17c0 1io0 17c0 1fA0 1a00 1a00 1qM0 WM0 1qM0 11A0 1o00 WM0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1tA0 IM0 90o0 U00 1tA0 U00 1tA0 U00 1tA0 U00 1tA0 WM0 1qM0 WM0 1qM0 WM0 1tA0 U00 1tA0 U00 1tA0 11z0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1o00 14o0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|12e5",
+		"EST|EST|50|0||",
+		"EST5EDT|EST EDT EWT EPT|50 40 40 40|010102301010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010|-261t0 1nX0 11B0 1nX0 SgN0 8x40 iv0 QwN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 s10 1Vz0 LB0 1BX0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|",
+		"Etc/GMT-0|GMT|0|0||",
+		"Etc/GMT-1|+01|-10|0||",
+		"Pacific/Port_Moresby|+10|-a0|0||25e4",
+		"Etc/GMT-11|+11|-b0|0||",
+		"Pacific/Tarawa|+12|-c0|0||29e3",
+		"Etc/GMT-13|+13|-d0|0||",
+		"Etc/GMT-14|+14|-e0|0||",
+		"Etc/GMT-2|+02|-20|0||",
+		"Etc/GMT-3|+03|-30|0||",
+		"Etc/GMT-4|+04|-40|0||",
+		"Etc/GMT-5|+05|-50|0||",
+		"Etc/GMT-6|+06|-60|0||",
+		"Indian/Christmas|+07|-70|0||21e2",
+		"Etc/GMT-8|+08|-80|0||",
+		"Pacific/Palau|+09|-90|0||21e3",
+		"Etc/GMT+1|-01|10|0||",
+		"Etc/GMT+10|-10|a0|0||",
+		"Etc/GMT+11|-11|b0|0||",
+		"Etc/GMT+12|-12|c0|0||",
+		"Etc/GMT+3|-03|30|0||",
+		"Etc/GMT+4|-04|40|0||",
+		"Etc/GMT+5|-05|50|0||",
+		"Etc/GMT+6|-06|60|0||",
+		"Etc/GMT+7|-07|70|0||",
+		"Etc/GMT+8|-08|80|0||",
+		"Etc/GMT+9|-09|90|0||",
+		"Etc/UTC|UTC|0|0||",
+		"Europe/Amsterdam|AMT NST +0120 +0020 CEST CET|-j.w -1j.w -1k -k -20 -10|010101010101010101010101010101010101010101012323234545454545454545454545454545454545454545454545454545454545454545454545454545454545454545454545454545454545454545454545454545454545|-2aFcj.w 11b0 1iP0 11A0 1io0 1cM0 1fA0 1a00 1fA0 1a00 1fA0 1a00 1co0 1io0 1yo0 Pc0 1a00 1fA0 1Bc0 Mo0 1tc0 Uo0 1tA0 U00 1uo0 W00 1s00 VA0 1so0 Vc0 1sM0 UM0 1wo0 Rc0 1u00 Wo0 1rA0 W00 1s00 VA0 1sM0 UM0 1w00 fV0 BCX.w 1tA0 U00 1u00 Wo0 1sm0 601k WM0 1fA0 1cM0 1cM0 1cM0 16M0 1gMM0 1a00 1fA0 1cM0 1cM0 1cM0 1fA0 1a00 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|16e5",
+		"Europe/Andorra|WET CET CEST|0 -10 -20|012121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121|-UBA0 1xIN0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|79e3",
+		"Europe/Astrakhan|LMT +03 +04 +05|-3c.c -30 -40 -50|012323232323232323212121212121212121212121212121212121212121212|-1Pcrc.c eUMc.c 23CL0 1db0 1cN0 1db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 2pB0 1cM0 1fA0 1cM0 3Co0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 8Hz0 3rd0|10e5",
+		"Europe/Athens|AMT EET EEST CEST CET|-1y.Q -20 -30 -20 -10|012123434121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121|-2a61x.Q CNbx.Q mn0 kU10 9b0 3Es0 Xa0 1fb0 1dd0 k3X0 Nz0 SCp0 1vc0 SO0 1cM0 1a00 1ao0 1fc0 1a10 1fG0 1cg0 1dX0 1bX0 1cQ0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|35e5",
+		"Europe/London|GMT BST BDST|0 -10 -20|0101010101010101010101010101010101010101010101010121212121210101210101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010|-2axa0 Rc0 1fA0 14M0 1fc0 1g00 1co0 1dc0 1co0 1oo0 1400 1dc0 19A0 1io0 1io0 WM0 1o00 14o0 1o00 17c0 1io0 17c0 1fA0 1a00 1lc0 17c0 1io0 17c0 1fA0 1a00 1io0 17c0 1io0 17c0 1fA0 1cM0 1io0 17c0 1fA0 1a00 1io0 17c0 1io0 17c0 1fA0 1a00 1io0 1qM0 Dc0 2Rz0 Dc0 1zc0 Oo0 1zc0 Rc0 1wo0 17c0 1iM0 FA0 xB0 1fA0 1a00 14o0 bb0 LA0 xB0 Rc0 1wo0 11A0 1o00 17c0 1fA0 1a00 1fA0 1cM0 1fA0 1a00 17c0 1fA0 1a00 1io0 17c0 1lc0 17c0 1fA0 1a00 1io0 17c0 1io0 17c0 1fA0 1a00 1a00 1qM0 WM0 1qM0 11A0 1o00 WM0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1tA0 IM0 90o0 U00 1tA0 U00 1tA0 U00 1tA0 U00 1tA0 WM0 1qM0 WM0 1qM0 WM0 1tA0 U00 1tA0 U00 1tA0 11z0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1o00 14o0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|10e6",
+		"Europe/Belgrade|CET CEST|-10 -20|01010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010|-19RC0 3IP0 WM0 1fA0 1cM0 1cM0 1rc0 Qo0 1vmo0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|12e5",
+		"Europe/Berlin|CET CEST CEMT|-10 -20 -30|01010101010101210101210101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010|-2aFe0 11d0 1iO0 11A0 1o00 11A0 Qrc0 6i00 WM0 1fA0 1cM0 1cM0 1cM0 kL0 Nc0 m10 WM0 1ao0 1cp0 dX0 jz0 Dd0 1io0 17c0 1fA0 1a00 1ehA0 1a00 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|41e5",
+		"Europe/Prague|CET CEST GMT|-10 -20 0|01010101010101010201010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010|-2aFe0 11d0 1iO0 11A0 1o00 11A0 Qrc0 6i00 WM0 1fA0 1cM0 1cM0 1cM0 1cM0 1qM0 11c0 mp0 xA0 mn0 17c0 1io0 17c0 1fc0 1ao0 1bNc0 1cM0 1fA0 1a00 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|13e5",
+		"Europe/Brussels|WET CET CEST WEST|0 -10 -20 -10|0121212103030303030303030303030303030303030303030303212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121|-2ehc0 3zX0 11c0 1iO0 11A0 1o00 11A0 my0 Ic0 1qM0 Rc0 1EM0 UM0 1u00 10o0 1io0 1io0 17c0 1a00 1fA0 1cM0 1cM0 1io0 17c0 1fA0 1a00 1io0 1a30 1io0 17c0 1fA0 1a00 1io0 17c0 1cM0 1cM0 1a00 1io0 1cM0 1cM0 1a00 1fA0 1io0 17c0 1cM0 1cM0 1a00 1fA0 1io0 1qM0 Dc0 y00 5Wn0 WM0 1fA0 1cM0 16M0 1iM0 16M0 1C00 Uo0 1eeo0 1a00 1fA0 1cM0 1cM0 1cM0 1fA0 1a00 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|21e5",
+		"Europe/Bucharest|BMT EET EEST|-1I.o -20 -30|0121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121|-1xApI.o 20LI.o RA0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1Axc0 On0 1fA0 1a10 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cK0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cL0 1cN0 1cL0 1fB0 1nX0 11E0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|19e5",
+		"Europe/Budapest|CET CEST|-10 -20|0101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010|-2aFe0 11d0 1iO0 11A0 1ip0 17b0 1op0 1tb0 Q2m0 3Ne0 WM0 1fA0 1cM0 1cM0 1oJ0 1dc0 1030 1fA0 1cM0 1cM0 1cM0 1cM0 1fA0 1a00 1iM0 1fA0 8Ha0 Rb0 1wN0 Rb0 1BB0 Lz0 1C20 LB0 SNX0 1a10 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|17e5",
+		"Europe/Zurich|CET CEST|-10 -20|01010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010|-19Lc0 11A0 1o00 11A0 1xG10 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|38e4",
+		"Europe/Chisinau|CMT BMT EET EEST CEST CET MSK MSD|-1T -1I.o -20 -30 -20 -10 -30 -40|012323232323232323234545467676767676767676767323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232|-26jdT wGMa.A 20LI.o RA0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 27A0 2en0 39g0 WM0 1fA0 1cM0 V90 1t7z0 1db0 1cN0 1db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 gL0 WO0 1cM0 1cM0 1cK0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1fB0 1nX0 11D0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|67e4",
+		"Europe/Copenhagen|CET CEST|-10 -20|0101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010|-2azC0 Tz0 VuO0 60q0 WM0 1fA0 1cM0 1cM0 1cM0 S00 1HA0 Nc0 1C00 Dc0 1Nc0 Ao0 1h5A0 1a00 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|12e5",
+		"Europe/Gibraltar|GMT BST BDST CET CEST|0 -10 -20 -10 -20|010101010101010101010101010101010101010101010101012121212121010121010101010101010101034343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343|-2axa0 Rc0 1fA0 14M0 1fc0 1g00 1co0 1dc0 1co0 1oo0 1400 1dc0 19A0 1io0 1io0 WM0 1o00 14o0 1o00 17c0 1io0 17c0 1fA0 1a00 1lc0 17c0 1io0 17c0 1fA0 1a00 1io0 17c0 1io0 17c0 1fA0 1cM0 1io0 17c0 1fA0 1a00 1io0 17c0 1io0 17c0 1fA0 1a00 1io0 1qM0 Dc0 2Rz0 Dc0 1zc0 Oo0 1zc0 Rc0 1wo0 17c0 1iM0 FA0 xB0 1fA0 1a00 14o0 bb0 LA0 xB0 Rc0 1wo0 11A0 1o00 17c0 1fA0 1a00 1fA0 1cM0 1fA0 1a00 17c0 1fA0 1a00 1io0 17c0 1lc0 17c0 1fA0 10Jz0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|30e3",
+		"Europe/Helsinki|HMT EET EEST|-1D.N -20 -30|0121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121|-1WuND.N OULD.N 1dA0 1xGq0 1cM0 1cM0 1cM0 1cN0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|12e5",
+		"Europe/Kaliningrad|CET CEST EET EEST MSK MSD +03|-10 -20 -20 -30 -30 -40 -30|01010101010101232454545454545454543232323232323232323232323232323232323232323262|-2aFe0 11d0 1iO0 11A0 1o00 11A0 Qrc0 6i00 WM0 1fA0 1cM0 1cM0 1cM0 390 7A0 1en0 12N0 1pbb0 1db0 1cN0 1db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cN0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 8Hz0|44e4",
+		"Europe/Kiev|KMT EET MSK CEST CET MSD EEST|-22.4 -20 -30 -20 -10 -40 -30|0123434252525252525252525256161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161|-1Pc22.4 eUo2.4 rnz0 2Hg0 WM0 1fA0 da0 1v4m0 1db0 1cN0 1db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 Db0 3220 1cK0 1cL0 1cN0 1cL0 1cN0 1cL0 1cQ0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|34e5",
+		"Europe/Kirov|LMT +03 +04 +05|-3i.M -30 -40 -50|01232323232323232321212121212121212121212121212121212121212121|-22WM0 qH90 23CL0 1db0 1cN0 1db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 2pB0 1cM0 1fA0 1cM0 3Co0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 8Hz0|48e4",
+		"Europe/Lisbon|LMT WET WEST WEMT CET CEST|A.J 0 -10 -20 -10 -20|012121212121212121212121212121212121212121212321232123212321212121212121212121212121212121212121214121212121212121212121212121212124545454212121212121212121212121212121212121212121212121212121212121212121212121212121212121|-2le00 aPX0 Sp0 LX0 1vc0 Tc0 1uM0 SM0 1vc0 Tc0 1vc0 SM0 1vc0 6600 1co0 3E00 17c0 1fA0 1a00 1io0 1a00 1io0 17c0 3I00 17c0 1cM0 1cM0 3Fc0 1cM0 1a00 1fA0 1io0 17c0 1cM0 1cM0 1a00 1fA0 1io0 1qM0 Dc0 1tA0 1cM0 1dc0 1400 gL0 IM0 s10 U00 dX0 Rc0 pd0 Rc0 gL0 Oo0 pd0 Rc0 gL0 Oo0 pd0 14o0 1cM0 1cP0 1cM0 1cM0 1cM0 1cM0 1cM0 3Co0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 pvy0 1cM0 1cM0 1fA0 1cM0 1cM0 1cN0 1cL0 1cN0 1cM0 1cM0 1cM0 1cM0 1cN0 1cL0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|27e5",
+		"Europe/Luxembourg|LMT CET CEST WET WEST WEST WET|-o.A -10 -20 0 -10 -20 -10|0121212134343434343434343434343434343434343434343434565651212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121|-2DG0o.A t6mo.A TB0 1nX0 Up0 1o20 11A0 rW0 CM0 1qP0 R90 1EO0 UK0 1u20 10m0 1ip0 1in0 17e0 19W0 1fB0 1db0 1cp0 1in0 17d0 1fz0 1a10 1in0 1a10 1in0 17f0 1fA0 1a00 1io0 17c0 1cM0 1cM0 1a00 1io0 1cM0 1cM0 1a00 1fA0 1io0 17c0 1cM0 1cM0 1a00 1fA0 1io0 1qM0 Dc0 vA0 60L0 WM0 1fA0 1cM0 17c0 1io0 16M0 1C00 Uo0 1eeo0 1a00 1fA0 1cM0 1cM0 1cM0 1fA0 1a00 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|54e4",
+		"Europe/Madrid|WET WEST WEMT CET CEST|0 -10 -20 -10 -20|010101010101010101210343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343|-25Td0 19B0 1cL0 1dd0 b1z0 18p0 3HX0 17d0 1fz0 1a10 1io0 1a00 1in0 17d0 iIn0 Hd0 1cL0 bb0 1200 2s20 14n0 5aL0 Mp0 1vz0 17d0 1in0 17d0 1in0 17d0 1in0 17d0 6hX0 11B0 XHX0 1a10 1fz0 1a10 19X0 1cN0 1fz0 1a10 1fC0 1cM0 1cM0 1cM0 1fA0 1a00 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|62e5",
+		"Europe/Malta|CET CEST|-10 -20|0101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010|-2arB0 Lz0 1cN0 1db0 1410 1on0 Wp0 1qL0 17d0 1cL0 M3B0 5M20 WM0 1fA0 1co0 17c0 1iM0 16m0 1de0 1lc0 14m0 1lc0 WO0 1qM0 GTW0 On0 1C10 LA0 1C00 LA0 1EM0 LA0 1C00 LA0 1zc0 Oo0 1C00 Oo0 1co0 1cM0 1lA0 Xc0 1qq0 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1o10 11z0 1iN0 19z0 1fB0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|42e4",
+		"Europe/Minsk|MMT EET MSK CEST CET MSD EEST +03|-1O -20 -30 -20 -10 -40 -30 -30|01234343252525252525252525261616161616161616161616161616161616161617|-1Pc1O eUnO qNX0 3gQ0 WM0 1fA0 1cM0 Al0 1tsn0 1db0 1cN0 1db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 3Fc0 1cN0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0|19e5",
+		"Europe/Monaco|PMT WET WEST WEMT CET CEST|-9.l 0 -10 -20 -10 -20|01212121212121212121212121212121212121212121212121232323232345454545454545454545454545454545454545454545454545454545454545454545454545454545454545454545454545454545454545454545454545454|-2nco9.l cNb9.l HA0 19A0 1iM0 11c0 1oo0 Wo0 1rc0 QM0 1EM0 UM0 1u00 10o0 1io0 1wo0 Rc0 1a00 1fA0 1cM0 1cM0 1io0 17c0 1fA0 1a00 1io0 1a00 1io0 17c0 1fA0 1a00 1io0 17c0 1cM0 1cM0 1a00 1io0 1cM0 1cM0 1a00 1fA0 1io0 17c0 1cM0 1cM0 1a00 1fA0 1io0 1qM0 Df0 2RV0 11z0 11B0 1ze0 WM0 1fA0 1cM0 1fa0 1aq0 16M0 1ekn0 1cL0 1fC0 1a00 1fA0 1cM0 1cM0 1cM0 1fA0 1a00 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|38e3",
+		"Europe/Moscow|MMT MMT MST MDST MSD MSK +05 EET EEST MSK|-2u.h -2v.j -3v.j -4v.j -40 -30 -50 -20 -30 -40|012132345464575454545454545454545458754545454545454545454545454545454545454595|-2ag2u.h 2pyW.W 1bA0 11X0 GN0 1Hb0 c4v.j ik0 3DA0 dz0 15A0 c10 2q10 iM10 23CL0 1db0 1cN0 1db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cN0 IM0 rX0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 8Hz0|16e6",
+		"Europe/Paris|PMT WET WEST CEST CET WEMT|-9.l 0 -10 -20 -10 -20|0121212121212121212121212121212121212121212121212123434352543434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434343434|-2nco8.l cNb8.l HA0 19A0 1iM0 11c0 1oo0 Wo0 1rc0 QM0 1EM0 UM0 1u00 10o0 1io0 1wo0 Rc0 1a00 1fA0 1cM0 1cM0 1io0 17c0 1fA0 1a00 1io0 1a00 1io0 17c0 1fA0 1a00 1io0 17c0 1cM0 1cM0 1a00 1io0 1cM0 1cM0 1a00 1fA0 1io0 17c0 1cM0 1cM0 1a00 1fA0 1io0 1qM0 Df0 Ik0 5M30 WM0 1fA0 1cM0 Vx0 hB0 1aq0 16M0 1ekn0 1cL0 1fC0 1a00 1fA0 1cM0 1cM0 1cM0 1fA0 1a00 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|11e6",
+		"Europe/Riga|RMT LST EET MSK CEST CET MSD EEST|-1A.y -2A.y -20 -30 -20 -10 -40 -30|010102345454536363636363636363727272727272727272727272727272727272727272727272727272727272727272727272727272727272727272727272|-25TzA.y 11A0 1iM0 ko0 gWm0 yDXA.y 2bX0 3fE0 WM0 1fA0 1cM0 1cM0 4m0 1sLy0 1db0 1cN0 1db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cN0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cN0 1o00 11A0 1o00 11A0 1qM0 3oo0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|64e4",
+		"Europe/Rome|CET CEST|-10 -20|0101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010|-2arB0 Lz0 1cN0 1db0 1410 1on0 Wp0 1qL0 17d0 1cL0 M3B0 5M20 WM0 1fA0 1cM0 16M0 1iM0 16m0 1de0 1lc0 14m0 1lc0 WO0 1qM0 GTW0 On0 1C10 LA0 1C00 LA0 1EM0 LA0 1C00 LA0 1zc0 Oo0 1C00 Oo0 1C00 LA0 1zc0 Oo0 1C00 LA0 1C00 LA0 1zc0 Oo0 1C00 Oo0 1zc0 Oo0 1fC0 1a00 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|39e5",
+		"Europe/Samara|LMT +03 +04 +05|-3k.k -30 -40 -50|0123232323232323232121232323232323232323232323232323232323212|-22WM0 qH90 23CL0 1db0 1cN0 1db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 2pB0 1cM0 1fA0 2y10 14m0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 2sp0 WM0|12e5",
+		"Europe/Saratov|LMT +03 +04 +05|-34.i -30 -40 -50|012323232323232321212121212121212121212121212121212121212121212|-22WM0 qH90 23CL0 1db0 1cN0 1db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 2pB0 1cM0 1cM0 1cM0 1fA0 1cM0 3Co0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 8Hz0 5810|",
+		"Europe/Simferopol|SMT EET MSK CEST CET MSD EEST MSK|-2g -20 -30 -20 -10 -40 -30 -40|012343432525252525252525252161616525252616161616161616161616161616161616172|-1Pc2g eUog rEn0 2qs0 WM0 1fA0 1cM0 3V0 1u0L0 1db0 1cN0 1db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1Q00 4eL0 1cL0 1cN0 1cL0 1cN0 dX0 WL0 1cN0 1cL0 1fB0 1o30 11B0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11z0 1nW0|33e4",
+		"Europe/Sofia|EET CET CEST EEST|-20 -10 -20 -30|01212103030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030|-168L0 WM0 1fA0 1cM0 1cM0 1cN0 1mKH0 1dd0 1fb0 1ap0 1fb0 1a20 1fy0 1a30 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cK0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1fB0 1nX0 11E0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|12e5",
+		"Europe/Stockholm|CET CEST|-10 -20|01010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010|-2azC0 TB0 2yDe0 1a00 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|15e5",
+		"Europe/Tallinn|TMT CET CEST EET MSK MSD EEST|-1D -10 -20 -20 -30 -40 -30|012103421212454545454545454546363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363|-26oND teD 11A0 1Ta0 4rXl KSLD 2FX0 2Jg0 WM0 1fA0 1cM0 18J0 1sTX0 1db0 1cN0 1db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cN0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o10 11A0 1qM0 5QM0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|41e4",
+		"Europe/Tirane|LMT CET CEST|-1j.k -10 -20|01212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121|-2glBj.k 14pcj.k 5LC0 WM0 4M0 1fCK0 10n0 1op0 11z0 1pd0 11z0 1qN0 WL0 1qp0 Xb0 1qp0 Xb0 1qp0 11z0 1lB0 11z0 1qN0 11z0 1iN0 16n0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|42e4",
+		"Europe/Ulyanovsk|LMT +03 +04 +05 +02|-3d.A -30 -40 -50 -20|01232323232323232321214121212121212121212121212121212121212121212|-22WM0 qH90 23CL0 1db0 1cN0 1db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 2pB0 1cM0 1fA0 2pB0 IM0 rX0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 8Hz0 3rd0|13e5",
+		"Europe/Uzhgorod|CET CEST MSK MSD EET EEST|-10 -20 -30 -40 -20 -30|010101023232323232323232320454545454545454545454545454545454545454545454545454545454545454545454545454545454545454545454|-1cqL0 6i00 WM0 1fA0 1cM0 1ml0 1Cp0 1r3W0 1db0 1cN0 1db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1Q00 1Nf0 2pw0 1cL0 1cN0 1cL0 1cN0 1cL0 1cQ0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|11e4",
+		"Europe/Vienna|CET CEST|-10 -20|0101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010|-2aFe0 11d0 1iO0 11A0 1o00 11A0 3KM0 14o0 LA00 6i00 WM0 1fA0 1cM0 1cM0 1cM0 400 2qM0 1ao0 1co0 1cM0 1io0 17c0 1gHa0 19X0 1cP0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|18e5",
+		"Europe/Vilnius|WMT KMT CET EET MSK CEST MSD EEST|-1o -1z.A -10 -20 -30 -20 -40 -30|012324525254646464646464646473737373737373737352537373737373737373737373737373737373737373737373737373737373737373737373|-293do 6ILM.o 1Ooz.A zz0 Mfd0 29W0 3is0 WM0 1fA0 1cM0 LV0 1tgL0 1db0 1cN0 1db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cN0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11B0 1o00 11A0 1qM0 8io0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|54e4",
+		"Europe/Volgograd|LMT +03 +04 +05|-2V.E -30 -40 -50|012323232323232321212121212121212121212121212121212121212121212|-21IqV.E psLV.E 23CL0 1db0 1cN0 1db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 2pB0 1cM0 1cM0 1cM0 1fA0 1cM0 3Co0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 8Hz0 9Jd0|10e5",
+		"Europe/Warsaw|WMT CET CEST EET EEST|-1o -10 -20 -20 -30|012121234312121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121|-2ctdo 1LXo 11d0 1iO0 11A0 1o00 11A0 1on0 11A0 6zy0 HWP0 5IM0 WM0 1fA0 1cM0 1dz0 1mL0 1en0 15B0 1aq0 1nA0 11A0 1io0 17c0 1fA0 1a00 iDX0 LA0 1cM0 1cM0 1C00 Oo0 1cM0 1cM0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1C00 LA0 uso0 1a00 1fA0 1cM0 1cM0 1cM0 1fA0 1a00 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cN0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|17e5",
+		"Europe/Zaporozhye|+0220 EET MSK CEST CET MSD EEST|-2k -20 -30 -20 -10 -40 -30|01234342525252525252525252526161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161|-1Pc2k eUok rdb0 2RE0 WM0 1fA0 8m0 1v9a0 1db0 1cN0 1db0 1cN0 1db0 1dd0 1cO0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cK0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cQ0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|77e4",
+		"HST|HST|a0|0||",
+		"Indian/Chagos|LMT +05 +06|-4N.E -50 -60|012|-2xosN.E 3AGLN.E|30e2",
+		"Indian/Cocos|+0630|-6u|0||596",
+		"Indian/Kerguelen|-00 +05|0 -50|01|-MG00|130",
+		"Indian/Mahe|LMT +04|-3F.M -40|01|-2yO3F.M|79e3",
+		"Indian/Maldives|MMT +05|-4S -50|01|-olgS|35e4",
+		"Indian/Mauritius|LMT +04 +05|-3O -40 -50|012121|-2xorO 34unO 14L0 12kr0 11z0|15e4",
+		"Indian/Reunion|LMT +04|-3F.Q -40|01|-2mDDF.Q|84e4",
+		"Pacific/Kwajalein|+11 +10 +09 -12 +12|-b0 -a0 -90 c0 -c0|012034|-1kln0 akp0 6Up0 12ry0 Wan0|14e3",
+		"MET|MET MEST|-10 -20|01010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010|-2aFe0 11d0 1iO0 11A0 1o00 11A0 Qrc0 6i00 WM0 1fA0 1cM0 1cM0 1cM0 16M0 1gMM0 1a00 1fA0 1cM0 1cM0 1cM0 1fA0 1a00 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|",
+		"MST|MST|70|0||",
+		"MST7MDT|MST MDT MWT MPT|70 60 60 60|010102301010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010|-261r0 1nX0 11B0 1nX0 SgN0 8x20 ix0 QwN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 s10 1Vz0 LB0 1BX0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|",
+		"Pacific/Chatham|+1215 +1245 +1345|-cf -cJ -dJ|012121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212121212|-WqAf 1adef IM0 1C00 Rc0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Rc0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Oo0 1zc0 Rc0 1zc0 Oo0 1qM0 14o0 1lc0 14o0 1lc0 14o0 1lc0 17c0 1io0 17c0 1io0 17c0 1io0 17c0 1lc0 14o0 1lc0 14o0 1lc0 17c0 1io0 17c0 1io0 17c0 1lc0 14o0 1lc0 14o0 1lc0 17c0 1io0 17c0 1io0 17c0 1io0 17c0 1io0 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1cM0 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1cM0 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1io0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1cM0 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1cM0 1fA0 1a00 1fA0 1a00|600",
+		"Pacific/Apia|LMT -1130 -11 -10 +14 +13|bq.U bu b0 a0 -e0 -d0|01232345454545454545454545454545454545454545454545454545454|-2nDMx.4 1yW03.4 2rRbu 1ff0 1a00 CI0 AQ0 1cM0 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1cM0 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1io0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1cM0 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1a00 1fA0 1cM0 1fA0 1a00 1fA0 1a00|37e3",
+		"Pacific/Bougainville|+10 +09 +11|-a0 -90 -b0|0102|-16Wy0 7CN0 2MQp0|18e4",
+		"Pacific/Chuuk|+10 +09|-a0 -90|01010|-2ewy0 axB0 RVX0 axd0|49e3",
+		"Pacific/Efate|LMT +11 +12|-bd.g -b0 -c0|0121212121212121212121|-2l9nd.g 2Szcd.g 1cL0 1oN0 10L0 1fB0 19X0 1fB0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1fB0 Lz0 1Nd0 An0|66e3",
+		"Pacific/Enderbury|-12 -11 +13|c0 b0 -d0|012|nIc0 B7X0|1",
+		"Pacific/Fakaofo|-11 +13|b0 -d0|01|1Gfn0|483",
+		"Pacific/Fiji|LMT +12 +13|-bT.I -c0 -d0|0121212121212121212121212121212121212121212121212121212121212121|-2bUzT.I 3m8NT.I LA0 1EM0 IM0 nJc0 LA0 1o00 Rc0 1wo0 Ao0 1Nc0 Ao0 1Q00 xz0 1SN0 uM0 1SM0 uM0 1VA0 s00 1VA0 s00 1VA0 s00 20o0 pc0 20o0 s00 20o0 pc0 20o0 pc0 20o0 pc0 20o0 pc0 20o0 s00 1VA0 s00 20o0 pc0 20o0 pc0 20o0 pc0 20o0 pc0 20o0 s00 20o0 pc0 20o0 pc0 20o0 pc0 20o0 pc0 20o0 s00 1VA0 s00|88e4",
+		"Pacific/Galapagos|LMT -05 -06|5W.o 50 60|01212|-1yVS1.A 2dTz1.A gNd0 rz0|25e3",
+		"Pacific/Gambier|LMT -09|8X.M 90|01|-2jof0.c|125",
+		"Pacific/Guadalcanal|LMT +11|-aD.M -b0|01|-2joyD.M|11e4",
+		"Pacific/Guam|GST +09 GDT ChST|-a0 -90 -b0 -a0|01020202020202020203|-18jK0 6pB0 AhB0 3QL0 g2p0 3p91 WOX rX0 1zd0 Rb0 1wp0 Rb0 5xd0 rX0 5sN0 zb1 1C0X On0 ULb0|17e4",
+		"Pacific/Honolulu|HST HDT HWT HPT HST|au 9u 9u 9u a0|0102304|-1thLu 8x0 lef0 8wWu iAu 46p0|37e4",
+		"Pacific/Kiritimati|-1040 -10 +14|aE a0 -e0|012|nIaE B7Xk|51e2",
+		"Pacific/Kosrae|+11 +09 +10 +12|-b0 -90 -a0 -c0|01021030|-2ewz0 axC0 HBy0 akp0 axd0 WOK0 1bdz0|66e2",
+		"Pacific/Majuro|+11 +09 +10 +12|-b0 -90 -a0 -c0|0102103|-2ewz0 axC0 HBy0 akp0 6RB0 12um0|28e3",
+		"Pacific/Marquesas|LMT -0930|9i 9u|01|-2joeG|86e2",
+		"Pacific/Pago_Pago|LMT SST|bm.M b0|01|-2nDMB.c|37e2",
+		"Pacific/Nauru|LMT +1130 +09 +12|-b7.E -bu -90 -c0|01213|-1Xdn7.E QCnB.E 7mqu 1lnbu|10e3",
+		"Pacific/Niue|-1120 -1130 -11|bk bu b0|012|-KfME 17y0a|12e2",
+		"Pacific/Norfolk|+1112 +1130 +1230 +11 +12|-bc -bu -cu -b0 -c0|012134343434343434343434343434343434343434|-Kgbc W01G Oo0 1COo0 9Jcu 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0|25e4",
+		"Pacific/Noumea|LMT +11 +12|-b5.M -b0 -c0|01212121|-2l9n5.M 2EqM5.M xX0 1PB0 yn0 HeP0 Ao0|98e3",
+		"Pacific/Pitcairn|-0830 -08|8u 80|01|18Vku|56",
+		"Pacific/Pohnpei|+11 +09 +10|-b0 -90 -a0|010210|-2ewz0 axC0 HBy0 akp0 axd0|34e3",
+		"Pacific/Rarotonga|-1030 -0930 -10|au 9u a0|012121212121212121212121212|lyWu IL0 1zcu Onu 1zcu Onu 1zcu Rbu 1zcu Onu 1zcu Onu 1zcu Onu 1zcu Onu 1zcu Onu 1zcu Rbu 1zcu Onu 1zcu Onu 1zcu Onu|13e3",
+		"Pacific/Tahiti|LMT -10|9W.g a0|01|-2joe1.I|18e4",
+		"Pacific/Tongatapu|+1220 +13 +14|-ck -d0 -e0|0121212121|-1aB0k 2n5dk 15A0 1wo0 xz0 1Q10 xz0 zWN0 s00|75e3",
+		"PST8PDT|PST PDT PWT PPT|80 70 70 70|010102301010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010|-261q0 1nX0 11B0 1nX0 SgN0 8x10 iy0 QwN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1cN0 1cL0 1cN0 1cL0 s10 1Vz0 LB0 1BX0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 1cN0 1fz0 1a10 1fz0 1cN0 1cL0 1cN0 1cL0 1cN0 1cL0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 14p0 1lb0 14p0 1lb0 14p0 1nX0 11B0 1nX0 11B0 1nX0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Rd0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0 Op0 1zb0|",
+		"WET|WET WEST|0 -10|010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010|hDB0 1a00 1fA0 1cM0 1cM0 1cM0 1fA0 1a00 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1cM0 1fA0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00 11A0 1qM0 WM0 1qM0 WM0 1qM0 WM0 1qM0 11A0 1o00 11A0 1o00|"
+	],
+	"links": [
+		"Africa/Abidjan|Africa/Bamako",
+		"Africa/Abidjan|Africa/Banjul",
+		"Africa/Abidjan|Africa/Conakry",
+		"Africa/Abidjan|Africa/Dakar",
+		"Africa/Abidjan|Africa/Freetown",
+		"Africa/Abidjan|Africa/Lome",
+		"Africa/Abidjan|Africa/Nouakchott",
+		"Africa/Abidjan|Africa/Ouagadougou",
+		"Africa/Abidjan|Africa/Timbuktu",
+		"Africa/Abidjan|Atlantic/St_Helena",
+		"Africa/Cairo|Egypt",
+		"Africa/Johannesburg|Africa/Maseru",
+		"Africa/Johannesburg|Africa/Mbabane",
+		"Africa/Lagos|Africa/Bangui",
+		"Africa/Lagos|Africa/Brazzaville",
+		"Africa/Lagos|Africa/Douala",
+		"Africa/Lagos|Africa/Kinshasa",
+		"Africa/Lagos|Africa/Libreville",
+		"Africa/Lagos|Africa/Luanda",
+		"Africa/Lagos|Africa/Malabo",
+		"Africa/Lagos|Africa/Niamey",
+		"Africa/Lagos|Africa/Porto-Novo",
+		"Africa/Maputo|Africa/Blantyre",
+		"Africa/Maputo|Africa/Bujumbura",
+		"Africa/Maputo|Africa/Gaborone",
+		"Africa/Maputo|Africa/Harare",
+		"Africa/Maputo|Africa/Kigali",
+		"Africa/Maputo|Africa/Lubumbashi",
+		"Africa/Maputo|Africa/Lusaka",
+		"Africa/Nairobi|Africa/Addis_Ababa",
+		"Africa/Nairobi|Africa/Asmara",
+		"Africa/Nairobi|Africa/Asmera",
+		"Africa/Nairobi|Africa/Dar_es_Salaam",
+		"Africa/Nairobi|Africa/Djibouti",
+		"Africa/Nairobi|Africa/Kampala",
+		"Africa/Nairobi|Africa/Mogadishu",
+		"Africa/Nairobi|Indian/Antananarivo",
+		"Africa/Nairobi|Indian/Comoro",
+		"Africa/Nairobi|Indian/Mayotte",
+		"Africa/Tripoli|Libya",
+		"America/Adak|America/Atka",
+		"America/Adak|US/Aleutian",
+		"America/Anchorage|US/Alaska",
+		"America/Argentina/Buenos_Aires|America/Buenos_Aires",
+		"America/Argentina/Catamarca|America/Argentina/ComodRivadavia",
+		"America/Argentina/Catamarca|America/Catamarca",
+		"America/Argentina/Cordoba|America/Cordoba",
+		"America/Argentina/Cordoba|America/Rosario",
+		"America/Argentina/Jujuy|America/Jujuy",
+		"America/Argentina/Mendoza|America/Mendoza",
+		"America/Atikokan|America/Coral_Harbour",
+		"America/Chicago|US/Central",
+		"America/Curacao|America/Aruba",
+		"America/Curacao|America/Kralendijk",
+		"America/Curacao|America/Lower_Princes",
+		"America/Denver|America/Shiprock",
+		"America/Denver|Navajo",
+		"America/Denver|US/Mountain",
+		"America/Detroit|US/Michigan",
+		"America/Edmonton|Canada/Mountain",
+		"America/Fort_Wayne|America/Indiana/Indianapolis",
+		"America/Fort_Wayne|America/Indianapolis",
+		"America/Fort_Wayne|US/East-Indiana",
+		"America/Godthab|America/Nuuk",
+		"America/Halifax|Canada/Atlantic",
+		"America/Havana|Cuba",
+		"America/Indiana/Knox|America/Knox_IN",
+		"America/Indiana/Knox|US/Indiana-Starke",
+		"America/Jamaica|Jamaica",
+		"America/Kentucky/Louisville|America/Louisville",
+		"America/Los_Angeles|US/Pacific",
+		"America/Los_Angeles|US/Pacific-New",
+		"America/Manaus|Brazil/West",
+		"America/Mazatlan|Mexico/BajaSur",
+		"America/Mexico_City|Mexico/General",
+		"America/New_York|US/Eastern",
+		"America/Noronha|Brazil/DeNoronha",
+		"America/Panama|America/Cayman",
+		"America/Phoenix|US/Arizona",
+		"America/Port_of_Spain|America/Anguilla",
+		"America/Port_of_Spain|America/Antigua",
+		"America/Port_of_Spain|America/Dominica",
+		"America/Port_of_Spain|America/Grenada",
+		"America/Port_of_Spain|America/Guadeloupe",
+		"America/Port_of_Spain|America/Marigot",
+		"America/Port_of_Spain|America/Montserrat",
+		"America/Port_of_Spain|America/St_Barthelemy",
+		"America/Port_of_Spain|America/St_Kitts",
+		"America/Port_of_Spain|America/St_Lucia",
+		"America/Port_of_Spain|America/St_Thomas",
+		"America/Port_of_Spain|America/St_Vincent",
+		"America/Port_of_Spain|America/Tortola",
+		"America/Port_of_Spain|America/Virgin",
+		"America/Regina|Canada/Saskatchewan",
+		"America/Rio_Branco|America/Porto_Acre",
+		"America/Rio_Branco|Brazil/Acre",
+		"America/Santiago|Chile/Continental",
+		"America/Sao_Paulo|Brazil/East",
+		"America/St_Johns|Canada/Newfoundland",
+		"America/Tijuana|America/Ensenada",
+		"America/Tijuana|America/Santa_Isabel",
+		"America/Tijuana|Mexico/BajaNorte",
+		"America/Toronto|America/Montreal",
+		"America/Toronto|Canada/Eastern",
+		"America/Vancouver|Canada/Pacific",
+		"America/Whitehorse|Canada/Yukon",
+		"America/Winnipeg|Canada/Central",
+		"Asia/Ashgabat|Asia/Ashkhabad",
+		"Asia/Bangkok|Asia/Phnom_Penh",
+		"Asia/Bangkok|Asia/Vientiane",
+		"Asia/Dhaka|Asia/Dacca",
+		"Asia/Dubai|Asia/Muscat",
+		"Asia/Ho_Chi_Minh|Asia/Saigon",
+		"Asia/Hong_Kong|Hongkong",
+		"Asia/Jerusalem|Asia/Tel_Aviv",
+		"Asia/Jerusalem|Israel",
+		"Asia/Kathmandu|Asia/Katmandu",
+		"Asia/Kolkata|Asia/Calcutta",
+		"Asia/Kuala_Lumpur|Asia/Singapore",
+		"Asia/Kuala_Lumpur|Singapore",
+		"Asia/Macau|Asia/Macao",
+		"Asia/Makassar|Asia/Ujung_Pandang",
+		"Asia/Nicosia|Europe/Nicosia",
+		"Asia/Qatar|Asia/Bahrain",
+		"Asia/Rangoon|Asia/Yangon",
+		"Asia/Riyadh|Asia/Aden",
+		"Asia/Riyadh|Asia/Kuwait",
+		"Asia/Seoul|ROK",
+		"Asia/Shanghai|Asia/Chongqing",
+		"Asia/Shanghai|Asia/Chungking",
+		"Asia/Shanghai|Asia/Harbin",
+		"Asia/Shanghai|PRC",
+		"Asia/Taipei|ROC",
+		"Asia/Tehran|Iran",
+		"Asia/Thimphu|Asia/Thimbu",
+		"Asia/Tokyo|Japan",
+		"Asia/Ulaanbaatar|Asia/Ulan_Bator",
+		"Asia/Urumqi|Asia/Kashgar",
+		"Atlantic/Faroe|Atlantic/Faeroe",
+		"Atlantic/Reykjavik|Iceland",
+		"Atlantic/South_Georgia|Etc/GMT+2",
+		"Australia/Adelaide|Australia/South",
+		"Australia/Brisbane|Australia/Queensland",
+		"Australia/Broken_Hill|Australia/Yancowinna",
+		"Australia/Darwin|Australia/North",
+		"Australia/Hobart|Australia/Tasmania",
+		"Australia/Lord_Howe|Australia/LHI",
+		"Australia/Melbourne|Australia/Victoria",
+		"Australia/Perth|Australia/West",
+		"Australia/Sydney|Australia/ACT",
+		"Australia/Sydney|Australia/Canberra",
+		"Australia/Sydney|Australia/NSW",
+		"Etc/GMT-0|Etc/GMT",
+		"Etc/GMT-0|Etc/GMT+0",
+		"Etc/GMT-0|Etc/GMT0",
+		"Etc/GMT-0|Etc/Greenwich",
+		"Etc/GMT-0|GMT",
+		"Etc/GMT-0|GMT+0",
+		"Etc/GMT-0|GMT-0",
+		"Etc/GMT-0|GMT0",
+		"Etc/GMT-0|Greenwich",
+		"Etc/UTC|Etc/UCT",
+		"Etc/UTC|Etc/Universal",
+		"Etc/UTC|Etc/Zulu",
+		"Etc/UTC|UCT",
+		"Etc/UTC|UTC",
+		"Etc/UTC|Universal",
+		"Etc/UTC|Zulu",
+		"Europe/Belgrade|Europe/Ljubljana",
+		"Europe/Belgrade|Europe/Podgorica",
+		"Europe/Belgrade|Europe/Sarajevo",
+		"Europe/Belgrade|Europe/Skopje",
+		"Europe/Belgrade|Europe/Zagreb",
+		"Europe/Chisinau|Europe/Tiraspol",
+		"Europe/Dublin|Eire",
+		"Europe/Helsinki|Europe/Mariehamn",
+		"Europe/Istanbul|Asia/Istanbul",
+		"Europe/Istanbul|Turkey",
+		"Europe/Lisbon|Portugal",
+		"Europe/London|Europe/Belfast",
+		"Europe/London|Europe/Guernsey",
+		"Europe/London|Europe/Isle_of_Man",
+		"Europe/London|Europe/Jersey",
+		"Europe/London|GB",
+		"Europe/London|GB-Eire",
+		"Europe/Moscow|W-SU",
+		"Europe/Oslo|Arctic/Longyearbyen",
+		"Europe/Oslo|Atlantic/Jan_Mayen",
+		"Europe/Prague|Europe/Bratislava",
+		"Europe/Rome|Europe/San_Marino",
+		"Europe/Rome|Europe/Vatican",
+		"Europe/Warsaw|Poland",
+		"Europe/Zurich|Europe/Busingen",
+		"Europe/Zurich|Europe/Vaduz",
+		"Indian/Christmas|Etc/GMT-7",
+		"Pacific/Auckland|Antarctica/McMurdo",
+		"Pacific/Auckland|Antarctica/South_Pole",
+		"Pacific/Auckland|NZ",
+		"Pacific/Chatham|NZ-CHAT",
+		"Pacific/Chuuk|Pacific/Truk",
+		"Pacific/Chuuk|Pacific/Yap",
+		"Pacific/Easter|Chile/EasterIsland",
+		"Pacific/Guam|Pacific/Saipan",
+		"Pacific/Honolulu|Pacific/Johnston",
+		"Pacific/Honolulu|US/Hawaii",
+		"Pacific/Kwajalein|Kwajalein",
+		"Pacific/Pago_Pago|Pacific/Midway",
+		"Pacific/Pago_Pago|Pacific/Samoa",
+		"Pacific/Pago_Pago|US/Samoa",
+		"Pacific/Palau|Etc/GMT-9",
+		"Pacific/Pohnpei|Pacific/Ponape",
+		"Pacific/Port_Moresby|Etc/GMT-10",
+		"Pacific/Tarawa|Etc/GMT-12",
+		"Pacific/Tarawa|Pacific/Funafuti",
+		"Pacific/Tarawa|Pacific/Wake",
+		"Pacific/Tarawa|Pacific/Wallis"
+	],
+	"countries": [
+		"AD|Europe/Andorra",
+		"AE|Asia/Dubai",
+		"AF|Asia/Kabul",
+		"AG|America/Port_of_Spain America/Antigua",
+		"AI|America/Port_of_Spain America/Anguilla",
+		"AL|Europe/Tirane",
+		"AM|Asia/Yerevan",
+		"AO|Africa/Lagos Africa/Luanda",
+		"AQ|Antarctica/Casey Antarctica/Davis Antarctica/DumontDUrville Antarctica/Mawson Antarctica/Palmer Antarctica/Rothera Antarctica/Syowa Antarctica/Troll Antarctica/Vostok Pacific/Auckland Antarctica/McMurdo",
+		"AR|America/Argentina/Buenos_Aires America/Argentina/Cordoba America/Argentina/Salta America/Argentina/Jujuy America/Argentina/Tucuman America/Argentina/Catamarca America/Argentina/La_Rioja America/Argentina/San_Juan America/Argentina/Mendoza America/Argentina/San_Luis America/Argentina/Rio_Gallegos America/Argentina/Ushuaia",
+		"AS|Pacific/Pago_Pago",
+		"AT|Europe/Vienna",
+		"AU|Australia/Lord_Howe Antarctica/Macquarie Australia/Hobart Australia/Currie Australia/Melbourne Australia/Sydney Australia/Broken_Hill Australia/Brisbane Australia/Lindeman Australia/Adelaide Australia/Darwin Australia/Perth Australia/Eucla",
+		"AW|America/Curacao America/Aruba",
+		"AX|Europe/Helsinki Europe/Mariehamn",
+		"AZ|Asia/Baku",
+		"BA|Europe/Belgrade Europe/Sarajevo",
+		"BB|America/Barbados",
+		"BD|Asia/Dhaka",
+		"BE|Europe/Brussels",
+		"BF|Africa/Abidjan Africa/Ouagadougou",
+		"BG|Europe/Sofia",
+		"BH|Asia/Qatar Asia/Bahrain",
+		"BI|Africa/Maputo Africa/Bujumbura",
+		"BJ|Africa/Lagos Africa/Porto-Novo",
+		"BL|America/Port_of_Spain America/St_Barthelemy",
+		"BM|Atlantic/Bermuda",
+		"BN|Asia/Brunei",
+		"BO|America/La_Paz",
+		"BQ|America/Curacao America/Kralendijk",
+		"BR|America/Noronha America/Belem America/Fortaleza America/Recife America/Araguaina America/Maceio America/Bahia America/Sao_Paulo America/Campo_Grande America/Cuiaba America/Santarem America/Porto_Velho America/Boa_Vista America/Manaus America/Eirunepe America/Rio_Branco",
+		"BS|America/Nassau",
+		"BT|Asia/Thimphu",
+		"BW|Africa/Maputo Africa/Gaborone",
+		"BY|Europe/Minsk",
+		"BZ|America/Belize",
+		"CA|America/St_Johns America/Halifax America/Glace_Bay America/Moncton America/Goose_Bay America/Blanc-Sablon America/Toronto America/Nipigon America/Thunder_Bay America/Iqaluit America/Pangnirtung America/Atikokan America/Winnipeg America/Rainy_River America/Resolute America/Rankin_Inlet America/Regina America/Swift_Current America/Edmonton America/Cambridge_Bay America/Yellowknife America/Inuvik America/Creston America/Dawson_Creek America/Fort_Nelson America/Vancouver America/Whitehorse America/Dawson",
+		"CC|Indian/Cocos",
+		"CD|Africa/Maputo Africa/Lagos Africa/Kinshasa Africa/Lubumbashi",
+		"CF|Africa/Lagos Africa/Bangui",
+		"CG|Africa/Lagos Africa/Brazzaville",
+		"CH|Europe/Zurich",
+		"CI|Africa/Abidjan",
+		"CK|Pacific/Rarotonga",
+		"CL|America/Santiago America/Punta_Arenas Pacific/Easter",
+		"CM|Africa/Lagos Africa/Douala",
+		"CN|Asia/Shanghai Asia/Urumqi",
+		"CO|America/Bogota",
+		"CR|America/Costa_Rica",
+		"CU|America/Havana",
+		"CV|Atlantic/Cape_Verde",
+		"CW|America/Curacao",
+		"CX|Indian/Christmas",
+		"CY|Asia/Nicosia Asia/Famagusta",
+		"CZ|Europe/Prague",
+		"DE|Europe/Zurich Europe/Berlin Europe/Busingen",
+		"DJ|Africa/Nairobi Africa/Djibouti",
+		"DK|Europe/Copenhagen",
+		"DM|America/Port_of_Spain America/Dominica",
+		"DO|America/Santo_Domingo",
+		"DZ|Africa/Algiers",
+		"EC|America/Guayaquil Pacific/Galapagos",
+		"EE|Europe/Tallinn",
+		"EG|Africa/Cairo",
+		"EH|Africa/El_Aaiun",
+		"ER|Africa/Nairobi Africa/Asmara",
+		"ES|Europe/Madrid Africa/Ceuta Atlantic/Canary",
+		"ET|Africa/Nairobi Africa/Addis_Ababa",
+		"FI|Europe/Helsinki",
+		"FJ|Pacific/Fiji",
+		"FK|Atlantic/Stanley",
+		"FM|Pacific/Chuuk Pacific/Pohnpei Pacific/Kosrae",
+		"FO|Atlantic/Faroe",
+		"FR|Europe/Paris",
+		"GA|Africa/Lagos Africa/Libreville",
+		"GB|Europe/London",
+		"GD|America/Port_of_Spain America/Grenada",
+		"GE|Asia/Tbilisi",
+		"GF|America/Cayenne",
+		"GG|Europe/London Europe/Guernsey",
+		"GH|Africa/Accra",
+		"GI|Europe/Gibraltar",
+		"GL|America/Nuuk America/Danmarkshavn America/Scoresbysund America/Thule",
+		"GM|Africa/Abidjan Africa/Banjul",
+		"GN|Africa/Abidjan Africa/Conakry",
+		"GP|America/Port_of_Spain America/Guadeloupe",
+		"GQ|Africa/Lagos Africa/Malabo",
+		"GR|Europe/Athens",
+		"GS|Atlantic/South_Georgia",
+		"GT|America/Guatemala",
+		"GU|Pacific/Guam",
+		"GW|Africa/Bissau",
+		"GY|America/Guyana",
+		"HK|Asia/Hong_Kong",
+		"HN|America/Tegucigalpa",
+		"HR|Europe/Belgrade Europe/Zagreb",
+		"HT|America/Port-au-Prince",
+		"HU|Europe/Budapest",
+		"ID|Asia/Jakarta Asia/Pontianak Asia/Makassar Asia/Jayapura",
+		"IE|Europe/Dublin",
+		"IL|Asia/Jerusalem",
+		"IM|Europe/London Europe/Isle_of_Man",
+		"IN|Asia/Kolkata",
+		"IO|Indian/Chagos",
+		"IQ|Asia/Baghdad",
+		"IR|Asia/Tehran",
+		"IS|Atlantic/Reykjavik",
+		"IT|Europe/Rome",
+		"JE|Europe/London Europe/Jersey",
+		"JM|America/Jamaica",
+		"JO|Asia/Amman",
+		"JP|Asia/Tokyo",
+		"KE|Africa/Nairobi",
+		"KG|Asia/Bishkek",
+		"KH|Asia/Bangkok Asia/Phnom_Penh",
+		"KI|Pacific/Tarawa Pacific/Enderbury Pacific/Kiritimati",
+		"KM|Africa/Nairobi Indian/Comoro",
+		"KN|America/Port_of_Spain America/St_Kitts",
+		"KP|Asia/Pyongyang",
+		"KR|Asia/Seoul",
+		"KW|Asia/Riyadh Asia/Kuwait",
+		"KY|America/Panama America/Cayman",
+		"KZ|Asia/Almaty Asia/Qyzylorda Asia/Qostanay Asia/Aqtobe Asia/Aqtau Asia/Atyrau Asia/Oral",
+		"LA|Asia/Bangkok Asia/Vientiane",
+		"LB|Asia/Beirut",
+		"LC|America/Port_of_Spain America/St_Lucia",
+		"LI|Europe/Zurich Europe/Vaduz",
+		"LK|Asia/Colombo",
+		"LR|Africa/Monrovia",
+		"LS|Africa/Johannesburg Africa/Maseru",
+		"LT|Europe/Vilnius",
+		"LU|Europe/Luxembourg",
+		"LV|Europe/Riga",
+		"LY|Africa/Tripoli",
+		"MA|Africa/Casablanca",
+		"MC|Europe/Monaco",
+		"MD|Europe/Chisinau",
+		"ME|Europe/Belgrade Europe/Podgorica",
+		"MF|America/Port_of_Spain America/Marigot",
+		"MG|Africa/Nairobi Indian/Antananarivo",
+		"MH|Pacific/Majuro Pacific/Kwajalein",
+		"MK|Europe/Belgrade Europe/Skopje",
+		"ML|Africa/Abidjan Africa/Bamako",
+		"MM|Asia/Yangon",
+		"MN|Asia/Ulaanbaatar Asia/Hovd Asia/Choibalsan",
+		"MO|Asia/Macau",
+		"MP|Pacific/Guam Pacific/Saipan",
+		"MQ|America/Martinique",
+		"MR|Africa/Abidjan Africa/Nouakchott",
+		"MS|America/Port_of_Spain America/Montserrat",
+		"MT|Europe/Malta",
+		"MU|Indian/Mauritius",
+		"MV|Indian/Maldives",
+		"MW|Africa/Maputo Africa/Blantyre",
+		"MX|America/Mexico_City America/Cancun America/Merida America/Monterrey America/Matamoros America/Mazatlan America/Chihuahua America/Ojinaga America/Hermosillo America/Tijuana America/Bahia_Banderas",
+		"MY|Asia/Kuala_Lumpur Asia/Kuching",
+		"MZ|Africa/Maputo",
+		"NA|Africa/Windhoek",
+		"NC|Pacific/Noumea",
+		"NE|Africa/Lagos Africa/Niamey",
+		"NF|Pacific/Norfolk",
+		"NG|Africa/Lagos",
+		"NI|America/Managua",
+		"NL|Europe/Amsterdam",
+		"NO|Europe/Oslo",
+		"NP|Asia/Kathmandu",
+		"NR|Pacific/Nauru",
+		"NU|Pacific/Niue",
+		"NZ|Pacific/Auckland Pacific/Chatham",
+		"OM|Asia/Dubai Asia/Muscat",
+		"PA|America/Panama",
+		"PE|America/Lima",
+		"PF|Pacific/Tahiti Pacific/Marquesas Pacific/Gambier",
+		"PG|Pacific/Port_Moresby Pacific/Bougainville",
+		"PH|Asia/Manila",
+		"PK|Asia/Karachi",
+		"PL|Europe/Warsaw",
+		"PM|America/Miquelon",
+		"PN|Pacific/Pitcairn",
+		"PR|America/Puerto_Rico",
+		"PS|Asia/Gaza Asia/Hebron",
+		"PT|Europe/Lisbon Atlantic/Madeira Atlantic/Azores",
+		"PW|Pacific/Palau",
+		"PY|America/Asuncion",
+		"QA|Asia/Qatar",
+		"RE|Indian/Reunion",
+		"RO|Europe/Bucharest",
+		"RS|Europe/Belgrade",
+		"RU|Europe/Kaliningrad Europe/Moscow Europe/Simferopol Europe/Kirov Europe/Astrakhan Europe/Volgograd Europe/Saratov Europe/Ulyanovsk Europe/Samara Asia/Yekaterinburg Asia/Omsk Asia/Novosibirsk Asia/Barnaul Asia/Tomsk Asia/Novokuznetsk Asia/Krasnoyarsk Asia/Irkutsk Asia/Chita Asia/Yakutsk Asia/Khandyga Asia/Vladivostok Asia/Ust-Nera Asia/Magadan Asia/Sakhalin Asia/Srednekolymsk Asia/Kamchatka Asia/Anadyr",
+		"RW|Africa/Maputo Africa/Kigali",
+		"SA|Asia/Riyadh",
+		"SB|Pacific/Guadalcanal",
+		"SC|Indian/Mahe",
+		"SD|Africa/Khartoum",
+		"SE|Europe/Stockholm",
+		"SG|Asia/Singapore",
+		"SH|Africa/Abidjan Atlantic/St_Helena",
+		"SI|Europe/Belgrade Europe/Ljubljana",
+		"SJ|Europe/Oslo Arctic/Longyearbyen",
+		"SK|Europe/Prague Europe/Bratislava",
+		"SL|Africa/Abidjan Africa/Freetown",
+		"SM|Europe/Rome Europe/San_Marino",
+		"SN|Africa/Abidjan Africa/Dakar",
+		"SO|Africa/Nairobi Africa/Mogadishu",
+		"SR|America/Paramaribo",
+		"SS|Africa/Juba",
+		"ST|Africa/Sao_Tome",
+		"SV|America/El_Salvador",
+		"SX|America/Curacao America/Lower_Princes",
+		"SY|Asia/Damascus",
+		"SZ|Africa/Johannesburg Africa/Mbabane",
+		"TC|America/Grand_Turk",
+		"TD|Africa/Ndjamena",
+		"TF|Indian/Reunion Indian/Kerguelen",
+		"TG|Africa/Abidjan Africa/Lome",
+		"TH|Asia/Bangkok",
+		"TJ|Asia/Dushanbe",
+		"TK|Pacific/Fakaofo",
+		"TL|Asia/Dili",
+		"TM|Asia/Ashgabat",
+		"TN|Africa/Tunis",
+		"TO|Pacific/Tongatapu",
+		"TR|Europe/Istanbul",
+		"TT|America/Port_of_Spain",
+		"TV|Pacific/Funafuti",
+		"TW|Asia/Taipei",
+		"TZ|Africa/Nairobi Africa/Dar_es_Salaam",
+		"UA|Europe/Simferopol Europe/Kiev Europe/Uzhgorod Europe/Zaporozhye",
+		"UG|Africa/Nairobi Africa/Kampala",
+		"UM|Pacific/Pago_Pago Pacific/Wake Pacific/Honolulu Pacific/Midway",
+		"US|America/New_York America/Detroit America/Kentucky/Louisville America/Kentucky/Monticello America/Indiana/Indianapolis America/Indiana/Vincennes America/Indiana/Winamac America/Indiana/Marengo America/Indiana/Petersburg America/Indiana/Vevay America/Chicago America/Indiana/Tell_City America/Indiana/Knox America/Menominee America/North_Dakota/Center America/North_Dakota/New_Salem America/North_Dakota/Beulah America/Denver America/Boise America/Phoenix America/Los_Angeles America/Anchorage America/Juneau America/Sitka America/Metlakatla America/Yakutat America/Nome America/Adak Pacific/Honolulu",
+		"UY|America/Montevideo",
+		"UZ|Asia/Samarkand Asia/Tashkent",
+		"VA|Europe/Rome Europe/Vatican",
+		"VC|America/Port_of_Spain America/St_Vincent",
+		"VE|America/Caracas",
+		"VG|America/Port_of_Spain America/Tortola",
+		"VI|America/Port_of_Spain America/St_Thomas",
+		"VN|Asia/Bangkok Asia/Ho_Chi_Minh",
+		"VU|Pacific/Efate",
+		"WF|Pacific/Wallis",
+		"WS|Pacific/Apia",
+		"YE|Asia/Riyadh Asia/Aden",
+		"YT|Africa/Nairobi Indian/Mayotte",
+		"ZA|Africa/Johannesburg",
+		"ZM|Africa/Maputo Africa/Lusaka",
+		"ZW|Africa/Maputo Africa/Harare"
+	]
+}
+},{}],11:[function(require,module,exports){
+var moment = module.exports = require("./moment-timezone");
+moment.tz.load(require('./data/packed/latest.json'));
+
+},{"./data/packed/latest.json":10,"./moment-timezone":12}],12:[function(require,module,exports){
+//! moment-timezone.js
+//! version : 0.5.31
+//! Copyright (c) JS Foundation and other contributors
+//! license : MIT
+//! github.com/moment/moment-timezone
+
+(function (root, factory) {
+	"use strict";
+
+	/*global define*/
+	if (typeof module === 'object' && module.exports) {
+		module.exports = factory(require('moment')); // Node
+	} else if (typeof define === 'function' && define.amd) {
+		define(['moment'], factory);                 // AMD
+	} else {
+		factory(root.moment);                        // Browser
+	}
+}(this, function (moment) {
+	"use strict";
+
+	// Resolves es6 module loading issue
+	if (moment.version === undefined && moment.default) {
+		moment = moment.default;
+	}
+
+	// Do not load moment-timezone a second time.
+	// if (moment.tz !== undefined) {
+	// 	logError('Moment Timezone ' + moment.tz.version + ' was already loaded ' + (moment.tz.dataVersion ? 'with data from ' : 'without any data') + moment.tz.dataVersion);
+	// 	return moment;
+	// }
+
+	var VERSION = "0.5.31",
+		zones = {},
+		links = {},
+		countries = {},
+		names = {},
+		guesses = {},
+		cachedGuess;
+
+	if (!moment || typeof moment.version !== 'string') {
+		logError('Moment Timezone requires Moment.js. See https://momentjs.com/timezone/docs/#/use-it/browser/');
+	}
+
+	var momentVersion = moment.version.split('.'),
+		major = +momentVersion[0],
+		minor = +momentVersion[1];
+
+	// Moment.js version check
+	if (major < 2 || (major === 2 && minor < 6)) {
+		logError('Moment Timezone requires Moment.js >= 2.6.0. You are using Moment.js ' + moment.version + '. See momentjs.com');
+	}
+
+	/************************************
+		Unpacking
+	************************************/
+
+	function charCodeToInt(charCode) {
+		if (charCode > 96) {
+			return charCode - 87;
+		} else if (charCode > 64) {
+			return charCode - 29;
+		}
+		return charCode - 48;
+	}
+
+	function unpackBase60(string) {
+		var i = 0,
+			parts = string.split('.'),
+			whole = parts[0],
+			fractional = parts[1] || '',
+			multiplier = 1,
+			num,
+			out = 0,
+			sign = 1;
+
+		// handle negative numbers
+		if (string.charCodeAt(0) === 45) {
+			i = 1;
+			sign = -1;
+		}
+
+		// handle digits before the decimal
+		for (i; i < whole.length; i++) {
+			num = charCodeToInt(whole.charCodeAt(i));
+			out = 60 * out + num;
+		}
+
+		// handle digits after the decimal
+		for (i = 0; i < fractional.length; i++) {
+			multiplier = multiplier / 60;
+			num = charCodeToInt(fractional.charCodeAt(i));
+			out += num * multiplier;
+		}
+
+		return out * sign;
+	}
+
+	function arrayToInt (array) {
+		for (var i = 0; i < array.length; i++) {
+			array[i] = unpackBase60(array[i]);
+		}
+	}
+
+	function intToUntil (array, length) {
+		for (var i = 0; i < length; i++) {
+			array[i] = Math.round((array[i - 1] || 0) + (array[i] * 60000)); // minutes to milliseconds
+		}
+
+		array[length - 1] = Infinity;
+	}
+
+	function mapIndices (source, indices) {
+		var out = [], i;
+
+		for (i = 0; i < indices.length; i++) {
+			out[i] = source[indices[i]];
+		}
+
+		return out;
+	}
+
+	function unpack (string) {
+		var data = string.split('|'),
+			offsets = data[2].split(' '),
+			indices = data[3].split(''),
+			untils  = data[4].split(' ');
+
+		arrayToInt(offsets);
+		arrayToInt(indices);
+		arrayToInt(untils);
+
+		intToUntil(untils, indices.length);
+
+		return {
+			name       : data[0],
+			abbrs      : mapIndices(data[1].split(' '), indices),
+			offsets    : mapIndices(offsets, indices),
+			untils     : untils,
+			population : data[5] | 0
+		};
+	}
+
+	/************************************
+		Zone object
+	************************************/
+
+	function Zone (packedString) {
+		if (packedString) {
+			this._set(unpack(packedString));
+		}
+	}
+
+	Zone.prototype = {
+		_set : function (unpacked) {
+			this.name       = unpacked.name;
+			this.abbrs      = unpacked.abbrs;
+			this.untils     = unpacked.untils;
+			this.offsets    = unpacked.offsets;
+			this.population = unpacked.population;
+		},
+
+		_index : function (timestamp) {
+			var target = +timestamp,
+				untils = this.untils,
+				i;
+
+			for (i = 0; i < untils.length; i++) {
+				if (target < untils[i]) {
+					return i;
+				}
+			}
+		},
+
+		countries : function () {
+			var zone_name = this.name;
+			return Object.keys(countries).filter(function (country_code) {
+				return countries[country_code].zones.indexOf(zone_name) !== -1;
+			});
+		},
+
+		parse : function (timestamp) {
+			var target  = +timestamp,
+				offsets = this.offsets,
+				untils  = this.untils,
+				max     = untils.length - 1,
+				offset, offsetNext, offsetPrev, i;
+
+			for (i = 0; i < max; i++) {
+				offset     = offsets[i];
+				offsetNext = offsets[i + 1];
+				offsetPrev = offsets[i ? i - 1 : i];
+
+				if (offset < offsetNext && tz.moveAmbiguousForward) {
+					offset = offsetNext;
+				} else if (offset > offsetPrev && tz.moveInvalidForward) {
+					offset = offsetPrev;
+				}
+
+				if (target < untils[i] - (offset * 60000)) {
+					return offsets[i];
+				}
+			}
+
+			return offsets[max];
+		},
+
+		abbr : function (mom) {
+			return this.abbrs[this._index(mom)];
+		},
+
+		offset : function (mom) {
+			logError("zone.offset has been deprecated in favor of zone.utcOffset");
+			return this.offsets[this._index(mom)];
+		},
+
+		utcOffset : function (mom) {
+			return this.offsets[this._index(mom)];
+		}
+	};
+
+	/************************************
+		Country object
+	************************************/
+
+	function Country (country_name, zone_names) {
+		this.name = country_name;
+		this.zones = zone_names;
+	}
+
+	/************************************
+		Current Timezone
+	************************************/
+
+	function OffsetAt(at) {
+		var timeString = at.toTimeString();
+		var abbr = timeString.match(/\([a-z ]+\)/i);
+		if (abbr && abbr[0]) {
+			// 17:56:31 GMT-0600 (CST)
+			// 17:56:31 GMT-0600 (Central Standard Time)
+			abbr = abbr[0].match(/[A-Z]/g);
+			abbr = abbr ? abbr.join('') : undefined;
+		} else {
+			// 17:56:31 CST
+			// 17:56:31 GMT+0800 (台北標準時間)
+			abbr = timeString.match(/[A-Z]{3,5}/g);
+			abbr = abbr ? abbr[0] : undefined;
+		}
+
+		if (abbr === 'GMT') {
+			abbr = undefined;
+		}
+
+		this.at = +at;
+		this.abbr = abbr;
+		this.offset = at.getTimezoneOffset();
+	}
+
+	function ZoneScore(zone) {
+		this.zone = zone;
+		this.offsetScore = 0;
+		this.abbrScore = 0;
+	}
+
+	ZoneScore.prototype.scoreOffsetAt = function (offsetAt) {
+		this.offsetScore += Math.abs(this.zone.utcOffset(offsetAt.at) - offsetAt.offset);
+		if (this.zone.abbr(offsetAt.at).replace(/[^A-Z]/g, '') !== offsetAt.abbr) {
+			this.abbrScore++;
+		}
+	};
+
+	function findChange(low, high) {
+		var mid, diff;
+
+		while ((diff = ((high.at - low.at) / 12e4 | 0) * 6e4)) {
+			mid = new OffsetAt(new Date(low.at + diff));
+			if (mid.offset === low.offset) {
+				low = mid;
+			} else {
+				high = mid;
+			}
+		}
+
+		return low;
+	}
+
+	function userOffsets() {
+		var startYear = new Date().getFullYear() - 2,
+			last = new OffsetAt(new Date(startYear, 0, 1)),
+			offsets = [last],
+			change, next, i;
+
+		for (i = 1; i < 48; i++) {
+			next = new OffsetAt(new Date(startYear, i, 1));
+			if (next.offset !== last.offset) {
+				change = findChange(last, next);
+				offsets.push(change);
+				offsets.push(new OffsetAt(new Date(change.at + 6e4)));
+			}
+			last = next;
+		}
+
+		for (i = 0; i < 4; i++) {
+			offsets.push(new OffsetAt(new Date(startYear + i, 0, 1)));
+			offsets.push(new OffsetAt(new Date(startYear + i, 6, 1)));
+		}
+
+		return offsets;
+	}
+
+	function sortZoneScores (a, b) {
+		if (a.offsetScore !== b.offsetScore) {
+			return a.offsetScore - b.offsetScore;
+		}
+		if (a.abbrScore !== b.abbrScore) {
+			return a.abbrScore - b.abbrScore;
+		}
+		if (a.zone.population !== b.zone.population) {
+			return b.zone.population - a.zone.population;
+		}
+		return b.zone.name.localeCompare(a.zone.name);
+	}
+
+	function addToGuesses (name, offsets) {
+		var i, offset;
+		arrayToInt(offsets);
+		for (i = 0; i < offsets.length; i++) {
+			offset = offsets[i];
+			guesses[offset] = guesses[offset] || {};
+			guesses[offset][name] = true;
+		}
+	}
+
+	function guessesForUserOffsets (offsets) {
+		var offsetsLength = offsets.length,
+			filteredGuesses = {},
+			out = [],
+			i, j, guessesOffset;
+
+		for (i = 0; i < offsetsLength; i++) {
+			guessesOffset = guesses[offsets[i].offset] || {};
+			for (j in guessesOffset) {
+				if (guessesOffset.hasOwnProperty(j)) {
+					filteredGuesses[j] = true;
+				}
+			}
+		}
+
+		for (i in filteredGuesses) {
+			if (filteredGuesses.hasOwnProperty(i)) {
+				out.push(names[i]);
+			}
+		}
+
+		return out;
+	}
+
+	function rebuildGuess () {
+
+		// use Intl API when available and returning valid time zone
+		try {
+			var intlName = Intl.DateTimeFormat().resolvedOptions().timeZone;
+			if (intlName && intlName.length > 3) {
+				var name = names[normalizeName(intlName)];
+				if (name) {
+					return name;
+				}
+				logError("Moment Timezone found " + intlName + " from the Intl api, but did not have that data loaded.");
+			}
+		} catch (e) {
+			// Intl unavailable, fall back to manual guessing.
+		}
+
+		var offsets = userOffsets(),
+			offsetsLength = offsets.length,
+			guesses = guessesForUserOffsets(offsets),
+			zoneScores = [],
+			zoneScore, i, j;
+
+		for (i = 0; i < guesses.length; i++) {
+			zoneScore = new ZoneScore(getZone(guesses[i]), offsetsLength);
+			for (j = 0; j < offsetsLength; j++) {
+				zoneScore.scoreOffsetAt(offsets[j]);
+			}
+			zoneScores.push(zoneScore);
+		}
+
+		zoneScores.sort(sortZoneScores);
+
+		return zoneScores.length > 0 ? zoneScores[0].zone.name : undefined;
+	}
+
+	function guess (ignoreCache) {
+		if (!cachedGuess || ignoreCache) {
+			cachedGuess = rebuildGuess();
+		}
+		return cachedGuess;
+	}
+
+	/************************************
+		Global Methods
+	************************************/
+
+	function normalizeName (name) {
+		return (name || '').toLowerCase().replace(/\//g, '_');
+	}
+
+	function addZone (packed) {
+		var i, name, split, normalized;
+
+		if (typeof packed === "string") {
+			packed = [packed];
+		}
+
+		for (i = 0; i < packed.length; i++) {
+			split = packed[i].split('|');
+			name = split[0];
+			normalized = normalizeName(name);
+			zones[normalized] = packed[i];
+			names[normalized] = name;
+			addToGuesses(normalized, split[2].split(' '));
+		}
+	}
+
+	function getZone (name, caller) {
+
+		name = normalizeName(name);
+
+		var zone = zones[name];
+		var link;
+
+		if (zone instanceof Zone) {
+			return zone;
+		}
+
+		if (typeof zone === 'string') {
+			zone = new Zone(zone);
+			zones[name] = zone;
+			return zone;
+		}
+
+		// Pass getZone to prevent recursion more than 1 level deep
+		if (links[name] && caller !== getZone && (link = getZone(links[name], getZone))) {
+			zone = zones[name] = new Zone();
+			zone._set(link);
+			zone.name = names[name];
+			return zone;
+		}
+
+		return null;
+	}
+
+	function getNames () {
+		var i, out = [];
+
+		for (i in names) {
+			if (names.hasOwnProperty(i) && (zones[i] || zones[links[i]]) && names[i]) {
+				out.push(names[i]);
+			}
+		}
+
+		return out.sort();
+	}
+
+	function getCountryNames () {
+		return Object.keys(countries);
+	}
+
+	function addLink (aliases) {
+		var i, alias, normal0, normal1;
+
+		if (typeof aliases === "string") {
+			aliases = [aliases];
+		}
+
+		for (i = 0; i < aliases.length; i++) {
+			alias = aliases[i].split('|');
+
+			normal0 = normalizeName(alias[0]);
+			normal1 = normalizeName(alias[1]);
+
+			links[normal0] = normal1;
+			names[normal0] = alias[0];
+
+			links[normal1] = normal0;
+			names[normal1] = alias[1];
+		}
+	}
+
+	function addCountries (data) {
+		var i, country_code, country_zones, split;
+		if (!data || !data.length) return;
+		for (i = 0; i < data.length; i++) {
+			split = data[i].split('|');
+			country_code = split[0].toUpperCase();
+			country_zones = split[1].split(' ');
+			countries[country_code] = new Country(
+				country_code,
+				country_zones
+			);
+		}
+	}
+
+	function getCountry (name) {
+		name = name.toUpperCase();
+		return countries[name] || null;
+	}
+
+	function zonesForCountry(country, with_offset) {
+		country = getCountry(country);
+
+		if (!country) return null;
+
+		var zones = country.zones.sort();
+
+		if (with_offset) {
+			return zones.map(function (zone_name) {
+				var zone = getZone(zone_name);
+				return {
+					name: zone_name,
+					offset: zone.utcOffset(new Date())
+				};
+			});
+		}
+
+		return zones;
+	}
+
+	function loadData (data) {
+		addZone(data.zones);
+		addLink(data.links);
+		addCountries(data.countries);
+		tz.dataVersion = data.version;
+	}
+
+	function zoneExists (name) {
+		if (!zoneExists.didShowError) {
+			zoneExists.didShowError = true;
+				logError("moment.tz.zoneExists('" + name + "') has been deprecated in favor of !moment.tz.zone('" + name + "')");
+		}
+		return !!getZone(name);
+	}
+
+	function needsOffset (m) {
+		var isUnixTimestamp = (m._f === 'X' || m._f === 'x');
+		return !!(m._a && (m._tzm === undefined) && !isUnixTimestamp);
+	}
+
+	function logError (message) {
+		if (typeof console !== 'undefined' && typeof console.error === 'function') {
+			console.error(message);
+		}
+	}
+
+	/************************************
+		moment.tz namespace
+	************************************/
+
+	function tz (input) {
+		var args = Array.prototype.slice.call(arguments, 0, -1),
+			name = arguments[arguments.length - 1],
+			zone = getZone(name),
+			out  = moment.utc.apply(null, args);
+
+		if (zone && !moment.isMoment(input) && needsOffset(out)) {
+			out.add(zone.parse(out), 'minutes');
+		}
+
+		out.tz(name);
+
+		return out;
+	}
+
+	tz.version      = VERSION;
+	tz.dataVersion  = '';
+	tz._zones       = zones;
+	tz._links       = links;
+	tz._names       = names;
+	tz._countries	= countries;
+	tz.add          = addZone;
+	tz.link         = addLink;
+	tz.load         = loadData;
+	tz.zone         = getZone;
+	tz.zoneExists   = zoneExists; // deprecated in 0.1.0
+	tz.guess        = guess;
+	tz.names        = getNames;
+	tz.Zone         = Zone;
+	tz.unpack       = unpack;
+	tz.unpackBase60 = unpackBase60;
+	tz.needsOffset  = needsOffset;
+	tz.moveInvalidForward   = true;
+	tz.moveAmbiguousForward = false;
+	tz.countries    = getCountryNames;
+	tz.zonesForCountry = zonesForCountry;
+
+	/************************************
+		Interface with Moment.js
+	************************************/
+
+	var fn = moment.fn;
+
+	moment.tz = tz;
+
+	moment.defaultZone = null;
+
+	moment.updateOffset = function (mom, keepTime) {
+		var zone = moment.defaultZone,
+			offset;
+
+		if (mom._z === undefined) {
+			if (zone && needsOffset(mom) && !mom._isUTC) {
+				mom._d = moment.utc(mom._a)._d;
+				mom.utc().add(zone.parse(mom), 'minutes');
+			}
+			mom._z = zone;
+		}
+		if (mom._z) {
+			offset = mom._z.utcOffset(mom);
+			if (Math.abs(offset) < 16) {
+				offset = offset / 60;
+			}
+			if (mom.utcOffset !== undefined) {
+				var z = mom._z;
+				mom.utcOffset(-offset, keepTime);
+				mom._z = z;
+			} else {
+				mom.zone(offset, keepTime);
+			}
+		}
+	};
+
+	fn.tz = function (name, keepTime) {
+		if (name) {
+			if (typeof name !== 'string') {
+				throw new Error('Time zone name must be a string, got ' + name + ' [' + typeof name + ']');
+			}
+			this._z = getZone(name);
+			if (this._z) {
+				moment.updateOffset(this, keepTime);
+			} else {
+				logError("Moment Timezone has no data for " + name + ". See http://momentjs.com/timezone/docs/#/data-loading/.");
+			}
+			return this;
+		}
+		if (this._z) { return this._z.name; }
+	};
+
+	function abbrWrap (old) {
+		return function () {
+			if (this._z) { return this._z.abbr(this); }
+			return old.call(this);
+		};
+	}
+
+	function resetZoneWrap (old) {
+		return function () {
+			this._z = null;
+			return old.apply(this, arguments);
+		};
+	}
+
+	function resetZoneWrap2 (old) {
+		return function () {
+			if (arguments.length > 0) this._z = null;
+			return old.apply(this, arguments);
+		};
+	}
+
+	fn.zoneName  = abbrWrap(fn.zoneName);
+	fn.zoneAbbr  = abbrWrap(fn.zoneAbbr);
+	fn.utc       = resetZoneWrap(fn.utc);
+	fn.local     = resetZoneWrap(fn.local);
+	fn.utcOffset = resetZoneWrap2(fn.utcOffset);
+
+	moment.tz.setDefault = function(name) {
+		if (major < 2 || (major === 2 && minor < 9)) {
+			logError('Moment Timezone setDefault() requires Moment.js >= 2.9.0. You are using Moment.js ' + moment.version + '.');
+		}
+		moment.defaultZone = name ? getZone(name) : null;
+		return moment;
+	};
+
+	// Cloning a moment should include the _z property.
+	var momentProperties = moment.momentProperties;
+	if (Object.prototype.toString.call(momentProperties) === '[object Array]') {
+		// moment 2.8.1+
+		momentProperties.push('_z');
+		momentProperties.push('_a');
+	} else if (momentProperties) {
+		// moment 2.7.0
+		momentProperties._z = null;
+	}
+
+	// INJECT DATA
+
+	return moment;
+}));
+
+},{"moment":13}],13:[function(require,module,exports){
+//! moment.js
+//! version : 2.29.1
+//! authors : Tim Wood, Iskren Chernev, Moment.js contributors
+//! license : MIT
+//! momentjs.com
+
+;(function (global, factory) {
+    typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory() :
+    typeof define === 'function' && define.amd ? define(factory) :
+    global.moment = factory()
+}(this, (function () { 'use strict';
+
+    var hookCallback;
+
+    function hooks() {
+        return hookCallback.apply(null, arguments);
+    }
+
+    // This is done to register the method called with moment()
+    // without creating circular dependencies.
+    function setHookCallback(callback) {
+        hookCallback = callback;
+    }
+
+    function isArray(input) {
+        return (
+            input instanceof Array ||
+            Object.prototype.toString.call(input) === '[object Array]'
+        );
+    }
+
+    function isObject(input) {
+        // IE8 will treat undefined and null as object if it wasn't for
+        // input != null
+        return (
+            input != null &&
+            Object.prototype.toString.call(input) === '[object Object]'
+        );
+    }
+
+    function hasOwnProp(a, b) {
+        return Object.prototype.hasOwnProperty.call(a, b);
+    }
+
+    function isObjectEmpty(obj) {
+        if (Object.getOwnPropertyNames) {
+            return Object.getOwnPropertyNames(obj).length === 0;
+        } else {
+            var k;
+            for (k in obj) {
+                if (hasOwnProp(obj, k)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+    }
+
+    function isUndefined(input) {
+        return input === void 0;
+    }
+
+    function isNumber(input) {
+        return (
+            typeof input === 'number' ||
+            Object.prototype.toString.call(input) === '[object Number]'
+        );
+    }
+
+    function isDate(input) {
+        return (
+            input instanceof Date ||
+            Object.prototype.toString.call(input) === '[object Date]'
+        );
+    }
+
+    function map(arr, fn) {
+        var res = [],
+            i;
+        for (i = 0; i < arr.length; ++i) {
+            res.push(fn(arr[i], i));
+        }
+        return res;
+    }
+
+    function extend(a, b) {
+        for (var i in b) {
+            if (hasOwnProp(b, i)) {
+                a[i] = b[i];
+            }
+        }
+
+        if (hasOwnProp(b, 'toString')) {
+            a.toString = b.toString;
+        }
+
+        if (hasOwnProp(b, 'valueOf')) {
+            a.valueOf = b.valueOf;
+        }
+
+        return a;
+    }
+
+    function createUTC(input, format, locale, strict) {
+        return createLocalOrUTC(input, format, locale, strict, true).utc();
+    }
+
+    function defaultParsingFlags() {
+        // We need to deep clone this object.
+        return {
+            empty: false,
+            unusedTokens: [],
+            unusedInput: [],
+            overflow: -2,
+            charsLeftOver: 0,
+            nullInput: false,
+            invalidEra: null,
+            invalidMonth: null,
+            invalidFormat: false,
+            userInvalidated: false,
+            iso: false,
+            parsedDateParts: [],
+            era: null,
+            meridiem: null,
+            rfc2822: false,
+            weekdayMismatch: false,
+        };
+    }
+
+    function getParsingFlags(m) {
+        if (m._pf == null) {
+            m._pf = defaultParsingFlags();
+        }
+        return m._pf;
+    }
+
+    var some;
+    if (Array.prototype.some) {
+        some = Array.prototype.some;
+    } else {
+        some = function (fun) {
+            var t = Object(this),
+                len = t.length >>> 0,
+                i;
+
+            for (i = 0; i < len; i++) {
+                if (i in t && fun.call(this, t[i], i, t)) {
+                    return true;
+                }
+            }
+
+            return false;
+        };
+    }
+
+    function isValid(m) {
+        if (m._isValid == null) {
+            var flags = getParsingFlags(m),
+                parsedParts = some.call(flags.parsedDateParts, function (i) {
+                    return i != null;
+                }),
+                isNowValid =
+                    !isNaN(m._d.getTime()) &&
+                    flags.overflow < 0 &&
+                    !flags.empty &&
+                    !flags.invalidEra &&
+                    !flags.invalidMonth &&
+                    !flags.invalidWeekday &&
+                    !flags.weekdayMismatch &&
+                    !flags.nullInput &&
+                    !flags.invalidFormat &&
+                    !flags.userInvalidated &&
+                    (!flags.meridiem || (flags.meridiem && parsedParts));
+
+            if (m._strict) {
+                isNowValid =
+                    isNowValid &&
+                    flags.charsLeftOver === 0 &&
+                    flags.unusedTokens.length === 0 &&
+                    flags.bigHour === undefined;
+            }
+
+            if (Object.isFrozen == null || !Object.isFrozen(m)) {
+                m._isValid = isNowValid;
+            } else {
+                return isNowValid;
+            }
+        }
+        return m._isValid;
+    }
+
+    function createInvalid(flags) {
+        var m = createUTC(NaN);
+        if (flags != null) {
+            extend(getParsingFlags(m), flags);
+        } else {
+            getParsingFlags(m).userInvalidated = true;
+        }
+
+        return m;
+    }
+
+    // Plugins that add properties should also add the key here (null value),
+    // so we can properly clone ourselves.
+    var momentProperties = (hooks.momentProperties = []),
+        updateInProgress = false;
+
+    function copyConfig(to, from) {
+        var i, prop, val;
+
+        if (!isUndefined(from._isAMomentObject)) {
+            to._isAMomentObject = from._isAMomentObject;
+        }
+        if (!isUndefined(from._i)) {
+            to._i = from._i;
+        }
+        if (!isUndefined(from._f)) {
+            to._f = from._f;
+        }
+        if (!isUndefined(from._l)) {
+            to._l = from._l;
+        }
+        if (!isUndefined(from._strict)) {
+            to._strict = from._strict;
+        }
+        if (!isUndefined(from._tzm)) {
+            to._tzm = from._tzm;
+        }
+        if (!isUndefined(from._isUTC)) {
+            to._isUTC = from._isUTC;
+        }
+        if (!isUndefined(from._offset)) {
+            to._offset = from._offset;
+        }
+        if (!isUndefined(from._pf)) {
+            to._pf = getParsingFlags(from);
+        }
+        if (!isUndefined(from._locale)) {
+            to._locale = from._locale;
+        }
+
+        if (momentProperties.length > 0) {
+            for (i = 0; i < momentProperties.length; i++) {
+                prop = momentProperties[i];
+                val = from[prop];
+                if (!isUndefined(val)) {
+                    to[prop] = val;
+                }
+            }
+        }
+
+        return to;
+    }
+
+    // Moment prototype object
+    function Moment(config) {
+        copyConfig(this, config);
+        this._d = new Date(config._d != null ? config._d.getTime() : NaN);
+        if (!this.isValid()) {
+            this._d = new Date(NaN);
+        }
+        // Prevent infinite loop in case updateOffset creates new moment
+        // objects.
+        if (updateInProgress === false) {
+            updateInProgress = true;
+            hooks.updateOffset(this);
+            updateInProgress = false;
+        }
+    }
+
+    function isMoment(obj) {
+        return (
+            obj instanceof Moment || (obj != null && obj._isAMomentObject != null)
+        );
+    }
+
+    function warn(msg) {
+        if (
+            hooks.suppressDeprecationWarnings === false &&
+            typeof console !== 'undefined' &&
+            console.warn
+        ) {
+            console.warn('Deprecation warning: ' + msg);
+        }
+    }
+
+    function deprecate(msg, fn) {
+        var firstTime = true;
+
+        return extend(function () {
+            if (hooks.deprecationHandler != null) {
+                hooks.deprecationHandler(null, msg);
+            }
+            if (firstTime) {
+                var args = [],
+                    arg,
+                    i,
+                    key;
+                for (i = 0; i < arguments.length; i++) {
+                    arg = '';
+                    if (typeof arguments[i] === 'object') {
+                        arg += '\n[' + i + '] ';
+                        for (key in arguments[0]) {
+                            if (hasOwnProp(arguments[0], key)) {
+                                arg += key + ': ' + arguments[0][key] + ', ';
+                            }
+                        }
+                        arg = arg.slice(0, -2); // Remove trailing comma and space
+                    } else {
+                        arg = arguments[i];
+                    }
+                    args.push(arg);
+                }
+                warn(
+                    msg +
+                        '\nArguments: ' +
+                        Array.prototype.slice.call(args).join('') +
+                        '\n' +
+                        new Error().stack
+                );
+                firstTime = false;
+            }
+            return fn.apply(this, arguments);
+        }, fn);
+    }
+
+    var deprecations = {};
+
+    function deprecateSimple(name, msg) {
+        if (hooks.deprecationHandler != null) {
+            hooks.deprecationHandler(name, msg);
+        }
+        if (!deprecations[name]) {
+            warn(msg);
+            deprecations[name] = true;
+        }
+    }
+
+    hooks.suppressDeprecationWarnings = false;
+    hooks.deprecationHandler = null;
+
+    function isFunction(input) {
+        return (
+            (typeof Function !== 'undefined' && input instanceof Function) ||
+            Object.prototype.toString.call(input) === '[object Function]'
+        );
+    }
+
+    function set(config) {
+        var prop, i;
+        for (i in config) {
+            if (hasOwnProp(config, i)) {
+                prop = config[i];
+                if (isFunction(prop)) {
+                    this[i] = prop;
+                } else {
+                    this['_' + i] = prop;
+                }
+            }
+        }
+        this._config = config;
+        // Lenient ordinal parsing accepts just a number in addition to
+        // number + (possibly) stuff coming from _dayOfMonthOrdinalParse.
+        // TODO: Remove "ordinalParse" fallback in next major release.
+        this._dayOfMonthOrdinalParseLenient = new RegExp(
+            (this._dayOfMonthOrdinalParse.source || this._ordinalParse.source) +
+                '|' +
+                /\d{1,2}/.source
+        );
+    }
+
+    function mergeConfigs(parentConfig, childConfig) {
+        var res = extend({}, parentConfig),
+            prop;
+        for (prop in childConfig) {
+            if (hasOwnProp(childConfig, prop)) {
+                if (isObject(parentConfig[prop]) && isObject(childConfig[prop])) {
+                    res[prop] = {};
+                    extend(res[prop], parentConfig[prop]);
+                    extend(res[prop], childConfig[prop]);
+                } else if (childConfig[prop] != null) {
+                    res[prop] = childConfig[prop];
+                } else {
+                    delete res[prop];
+                }
+            }
+        }
+        for (prop in parentConfig) {
+            if (
+                hasOwnProp(parentConfig, prop) &&
+                !hasOwnProp(childConfig, prop) &&
+                isObject(parentConfig[prop])
+            ) {
+                // make sure changes to properties don't modify parent config
+                res[prop] = extend({}, res[prop]);
+            }
+        }
+        return res;
+    }
+
+    function Locale(config) {
+        if (config != null) {
+            this.set(config);
+        }
+    }
+
+    var keys;
+
+    if (Object.keys) {
+        keys = Object.keys;
+    } else {
+        keys = function (obj) {
+            var i,
+                res = [];
+            for (i in obj) {
+                if (hasOwnProp(obj, i)) {
+                    res.push(i);
+                }
+            }
+            return res;
+        };
+    }
+
+    var defaultCalendar = {
+        sameDay: '[Today at] LT',
+        nextDay: '[Tomorrow at] LT',
+        nextWeek: 'dddd [at] LT',
+        lastDay: '[Yesterday at] LT',
+        lastWeek: '[Last] dddd [at] LT',
+        sameElse: 'L',
+    };
+
+    function calendar(key, mom, now) {
+        var output = this._calendar[key] || this._calendar['sameElse'];
+        return isFunction(output) ? output.call(mom, now) : output;
+    }
+
+    function zeroFill(number, targetLength, forceSign) {
+        var absNumber = '' + Math.abs(number),
+            zerosToFill = targetLength - absNumber.length,
+            sign = number >= 0;
+        return (
+            (sign ? (forceSign ? '+' : '') : '-') +
+            Math.pow(10, Math.max(0, zerosToFill)).toString().substr(1) +
+            absNumber
+        );
+    }
+
+    var formattingTokens = /(\[[^\[]*\])|(\\)?([Hh]mm(ss)?|Mo|MM?M?M?|Do|DDDo|DD?D?D?|ddd?d?|do?|w[o|w]?|W[o|W]?|Qo?|N{1,5}|YYYYYY|YYYYY|YYYY|YY|y{2,4}|yo?|gg(ggg?)?|GG(GGG?)?|e|E|a|A|hh?|HH?|kk?|mm?|ss?|S{1,9}|x|X|zz?|ZZ?|.)/g,
+        localFormattingTokens = /(\[[^\[]*\])|(\\)?(LTS|LT|LL?L?L?|l{1,4})/g,
+        formatFunctions = {},
+        formatTokenFunctions = {};
+
+    // token:    'M'
+    // padded:   ['MM', 2]
+    // ordinal:  'Mo'
+    // callback: function () { this.month() + 1 }
+    function addFormatToken(token, padded, ordinal, callback) {
+        var func = callback;
+        if (typeof callback === 'string') {
+            func = function () {
+                return this[callback]();
+            };
+        }
+        if (token) {
+            formatTokenFunctions[token] = func;
+        }
+        if (padded) {
+            formatTokenFunctions[padded[0]] = function () {
+                return zeroFill(func.apply(this, arguments), padded[1], padded[2]);
+            };
+        }
+        if (ordinal) {
+            formatTokenFunctions[ordinal] = function () {
+                return this.localeData().ordinal(
+                    func.apply(this, arguments),
+                    token
+                );
+            };
+        }
+    }
+
+    function removeFormattingTokens(input) {
+        if (input.match(/\[[\s\S]/)) {
+            return input.replace(/^\[|\]$/g, '');
+        }
+        return input.replace(/\\/g, '');
+    }
+
+    function makeFormatFunction(format) {
+        var array = format.match(formattingTokens),
+            i,
+            length;
+
+        for (i = 0, length = array.length; i < length; i++) {
+            if (formatTokenFunctions[array[i]]) {
+                array[i] = formatTokenFunctions[array[i]];
+            } else {
+                array[i] = removeFormattingTokens(array[i]);
+            }
+        }
+
+        return function (mom) {
+            var output = '',
+                i;
+            for (i = 0; i < length; i++) {
+                output += isFunction(array[i])
+                    ? array[i].call(mom, format)
+                    : array[i];
+            }
+            return output;
+        };
+    }
+
+    // format date using native date object
+    function formatMoment(m, format) {
+        if (!m.isValid()) {
+            return m.localeData().invalidDate();
+        }
+
+        format = expandFormat(format, m.localeData());
+        formatFunctions[format] =
+            formatFunctions[format] || makeFormatFunction(format);
+
+        return formatFunctions[format](m);
+    }
+
+    function expandFormat(format, locale) {
+        var i = 5;
+
+        function replaceLongDateFormatTokens(input) {
+            return locale.longDateFormat(input) || input;
+        }
+
+        localFormattingTokens.lastIndex = 0;
+        while (i >= 0 && localFormattingTokens.test(format)) {
+            format = format.replace(
+                localFormattingTokens,
+                replaceLongDateFormatTokens
+            );
+            localFormattingTokens.lastIndex = 0;
+            i -= 1;
+        }
+
+        return format;
+    }
+
+    var defaultLongDateFormat = {
+        LTS: 'h:mm:ss A',
+        LT: 'h:mm A',
+        L: 'MM/DD/YYYY',
+        LL: 'MMMM D, YYYY',
+        LLL: 'MMMM D, YYYY h:mm A',
+        LLLL: 'dddd, MMMM D, YYYY h:mm A',
+    };
+
+    function longDateFormat(key) {
+        var format = this._longDateFormat[key],
+            formatUpper = this._longDateFormat[key.toUpperCase()];
+
+        if (format || !formatUpper) {
+            return format;
+        }
+
+        this._longDateFormat[key] = formatUpper
+            .match(formattingTokens)
+            .map(function (tok) {
+                if (
+                    tok === 'MMMM' ||
+                    tok === 'MM' ||
+                    tok === 'DD' ||
+                    tok === 'dddd'
+                ) {
+                    return tok.slice(1);
+                }
+                return tok;
+            })
+            .join('');
+
+        return this._longDateFormat[key];
+    }
+
+    var defaultInvalidDate = 'Invalid date';
+
+    function invalidDate() {
+        return this._invalidDate;
+    }
+
+    var defaultOrdinal = '%d',
+        defaultDayOfMonthOrdinalParse = /\d{1,2}/;
+
+    function ordinal(number) {
+        return this._ordinal.replace('%d', number);
+    }
+
+    var defaultRelativeTime = {
+        future: 'in %s',
+        past: '%s ago',
+        s: 'a few seconds',
+        ss: '%d seconds',
+        m: 'a minute',
+        mm: '%d minutes',
+        h: 'an hour',
+        hh: '%d hours',
+        d: 'a day',
+        dd: '%d days',
+        w: 'a week',
+        ww: '%d weeks',
+        M: 'a month',
+        MM: '%d months',
+        y: 'a year',
+        yy: '%d years',
+    };
+
+    function relativeTime(number, withoutSuffix, string, isFuture) {
+        var output = this._relativeTime[string];
+        return isFunction(output)
+            ? output(number, withoutSuffix, string, isFuture)
+            : output.replace(/%d/i, number);
+    }
+
+    function pastFuture(diff, output) {
+        var format = this._relativeTime[diff > 0 ? 'future' : 'past'];
+        return isFunction(format) ? format(output) : format.replace(/%s/i, output);
+    }
+
+    var aliases = {};
+
+    function addUnitAlias(unit, shorthand) {
+        var lowerCase = unit.toLowerCase();
+        aliases[lowerCase] = aliases[lowerCase + 's'] = aliases[shorthand] = unit;
+    }
+
+    function normalizeUnits(units) {
+        return typeof units === 'string'
+            ? aliases[units] || aliases[units.toLowerCase()]
+            : undefined;
+    }
+
+    function normalizeObjectUnits(inputObject) {
+        var normalizedInput = {},
+            normalizedProp,
+            prop;
+
+        for (prop in inputObject) {
+            if (hasOwnProp(inputObject, prop)) {
+                normalizedProp = normalizeUnits(prop);
+                if (normalizedProp) {
+                    normalizedInput[normalizedProp] = inputObject[prop];
+                }
+            }
+        }
+
+        return normalizedInput;
+    }
+
+    var priorities = {};
+
+    function addUnitPriority(unit, priority) {
+        priorities[unit] = priority;
+    }
+
+    function getPrioritizedUnits(unitsObj) {
+        var units = [],
+            u;
+        for (u in unitsObj) {
+            if (hasOwnProp(unitsObj, u)) {
+                units.push({ unit: u, priority: priorities[u] });
+            }
+        }
+        units.sort(function (a, b) {
+            return a.priority - b.priority;
+        });
+        return units;
+    }
+
+    function isLeapYear(year) {
+        return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+    }
+
+    function absFloor(number) {
+        if (number < 0) {
+            // -0 -> 0
+            return Math.ceil(number) || 0;
+        } else {
+            return Math.floor(number);
+        }
+    }
+
+    function toInt(argumentForCoercion) {
+        var coercedNumber = +argumentForCoercion,
+            value = 0;
+
+        if (coercedNumber !== 0 && isFinite(coercedNumber)) {
+            value = absFloor(coercedNumber);
+        }
+
+        return value;
+    }
+
+    function makeGetSet(unit, keepTime) {
+        return function (value) {
+            if (value != null) {
+                set$1(this, unit, value);
+                hooks.updateOffset(this, keepTime);
+                return this;
+            } else {
+                return get(this, unit);
+            }
+        };
+    }
+
+    function get(mom, unit) {
+        return mom.isValid()
+            ? mom._d['get' + (mom._isUTC ? 'UTC' : '') + unit]()
+            : NaN;
+    }
+
+    function set$1(mom, unit, value) {
+        if (mom.isValid() && !isNaN(value)) {
+            if (
+                unit === 'FullYear' &&
+                isLeapYear(mom.year()) &&
+                mom.month() === 1 &&
+                mom.date() === 29
+            ) {
+                value = toInt(value);
+                mom._d['set' + (mom._isUTC ? 'UTC' : '') + unit](
+                    value,
+                    mom.month(),
+                    daysInMonth(value, mom.month())
+                );
+            } else {
+                mom._d['set' + (mom._isUTC ? 'UTC' : '') + unit](value);
+            }
+        }
+    }
+
+    // MOMENTS
+
+    function stringGet(units) {
+        units = normalizeUnits(units);
+        if (isFunction(this[units])) {
+            return this[units]();
+        }
+        return this;
+    }
+
+    function stringSet(units, value) {
+        if (typeof units === 'object') {
+            units = normalizeObjectUnits(units);
+            var prioritized = getPrioritizedUnits(units),
+                i;
+            for (i = 0; i < prioritized.length; i++) {
+                this[prioritized[i].unit](units[prioritized[i].unit]);
+            }
+        } else {
+            units = normalizeUnits(units);
+            if (isFunction(this[units])) {
+                return this[units](value);
+            }
+        }
+        return this;
+    }
+
+    var match1 = /\d/, //       0 - 9
+        match2 = /\d\d/, //      00 - 99
+        match3 = /\d{3}/, //     000 - 999
+        match4 = /\d{4}/, //    0000 - 9999
+        match6 = /[+-]?\d{6}/, // -999999 - 999999
+        match1to2 = /\d\d?/, //       0 - 99
+        match3to4 = /\d\d\d\d?/, //     999 - 9999
+        match5to6 = /\d\d\d\d\d\d?/, //   99999 - 999999
+        match1to3 = /\d{1,3}/, //       0 - 999
+        match1to4 = /\d{1,4}/, //       0 - 9999
+        match1to6 = /[+-]?\d{1,6}/, // -999999 - 999999
+        matchUnsigned = /\d+/, //       0 - inf
+        matchSigned = /[+-]?\d+/, //    -inf - inf
+        matchOffset = /Z|[+-]\d\d:?\d\d/gi, // +00:00 -00:00 +0000 -0000 or Z
+        matchShortOffset = /Z|[+-]\d\d(?::?\d\d)?/gi, // +00 -00 +00:00 -00:00 +0000 -0000 or Z
+        matchTimestamp = /[+-]?\d+(\.\d{1,3})?/, // 123456789 123456789.123
+        // any word (or two) characters or numbers including two/three word month in arabic.
+        // includes scottish gaelic two word and hyphenated months
+        matchWord = /[0-9]{0,256}['a-z\u00A0-\u05FF\u0700-\uD7FF\uF900-\uFDCF\uFDF0-\uFF07\uFF10-\uFFEF]{1,256}|[\u0600-\u06FF\/]{1,256}(\s*?[\u0600-\u06FF]{1,256}){1,2}/i,
+        regexes;
+
+    regexes = {};
+
+    function addRegexToken(token, regex, strictRegex) {
+        regexes[token] = isFunction(regex)
+            ? regex
+            : function (isStrict, localeData) {
+                  return isStrict && strictRegex ? strictRegex : regex;
+              };
+    }
+
+    function getParseRegexForToken(token, config) {
+        if (!hasOwnProp(regexes, token)) {
+            return new RegExp(unescapeFormat(token));
+        }
+
+        return regexes[token](config._strict, config._locale);
+    }
+
+    // Code from http://stackoverflow.com/questions/3561493/is-there-a-regexp-escape-function-in-javascript
+    function unescapeFormat(s) {
+        return regexEscape(
+            s
+                .replace('\\', '')
+                .replace(/\\(\[)|\\(\])|\[([^\]\[]*)\]|\\(.)/g, function (
+                    matched,
+                    p1,
+                    p2,
+                    p3,
+                    p4
+                ) {
+                    return p1 || p2 || p3 || p4;
+                })
+        );
+    }
+
+    function regexEscape(s) {
+        return s.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    }
+
+    var tokens = {};
+
+    function addParseToken(token, callback) {
+        var i,
+            func = callback;
+        if (typeof token === 'string') {
+            token = [token];
+        }
+        if (isNumber(callback)) {
+            func = function (input, array) {
+                array[callback] = toInt(input);
+            };
+        }
+        for (i = 0; i < token.length; i++) {
+            tokens[token[i]] = func;
+        }
+    }
+
+    function addWeekParseToken(token, callback) {
+        addParseToken(token, function (input, array, config, token) {
+            config._w = config._w || {};
+            callback(input, config._w, config, token);
+        });
+    }
+
+    function addTimeToArrayFromToken(token, input, config) {
+        if (input != null && hasOwnProp(tokens, token)) {
+            tokens[token](input, config._a, config, token);
+        }
+    }
+
+    var YEAR = 0,
+        MONTH = 1,
+        DATE = 2,
+        HOUR = 3,
+        MINUTE = 4,
+        SECOND = 5,
+        MILLISECOND = 6,
+        WEEK = 7,
+        WEEKDAY = 8;
+
+    function mod(n, x) {
+        return ((n % x) + x) % x;
+    }
+
+    var indexOf;
+
+    if (Array.prototype.indexOf) {
+        indexOf = Array.prototype.indexOf;
+    } else {
+        indexOf = function (o) {
+            // I know
+            var i;
+            for (i = 0; i < this.length; ++i) {
+                if (this[i] === o) {
+                    return i;
+                }
+            }
+            return -1;
+        };
+    }
+
+    function daysInMonth(year, month) {
+        if (isNaN(year) || isNaN(month)) {
+            return NaN;
+        }
+        var modMonth = mod(month, 12);
+        year += (month - modMonth) / 12;
+        return modMonth === 1
+            ? isLeapYear(year)
+                ? 29
+                : 28
+            : 31 - ((modMonth % 7) % 2);
+    }
+
+    // FORMATTING
+
+    addFormatToken('M', ['MM', 2], 'Mo', function () {
+        return this.month() + 1;
+    });
+
+    addFormatToken('MMM', 0, 0, function (format) {
+        return this.localeData().monthsShort(this, format);
+    });
+
+    addFormatToken('MMMM', 0, 0, function (format) {
+        return this.localeData().months(this, format);
+    });
+
+    // ALIASES
+
+    addUnitAlias('month', 'M');
+
+    // PRIORITY
+
+    addUnitPriority('month', 8);
+
+    // PARSING
+
+    addRegexToken('M', match1to2);
+    addRegexToken('MM', match1to2, match2);
+    addRegexToken('MMM', function (isStrict, locale) {
+        return locale.monthsShortRegex(isStrict);
+    });
+    addRegexToken('MMMM', function (isStrict, locale) {
+        return locale.monthsRegex(isStrict);
+    });
+
+    addParseToken(['M', 'MM'], function (input, array) {
+        array[MONTH] = toInt(input) - 1;
+    });
+
+    addParseToken(['MMM', 'MMMM'], function (input, array, config, token) {
+        var month = config._locale.monthsParse(input, token, config._strict);
+        // if we didn't find a month name, mark the date as invalid.
+        if (month != null) {
+            array[MONTH] = month;
+        } else {
+            getParsingFlags(config).invalidMonth = input;
+        }
+    });
+
+    // LOCALES
+
+    var defaultLocaleMonths = 'January_February_March_April_May_June_July_August_September_October_November_December'.split(
+            '_'
+        ),
+        defaultLocaleMonthsShort = 'Jan_Feb_Mar_Apr_May_Jun_Jul_Aug_Sep_Oct_Nov_Dec'.split(
+            '_'
+        ),
+        MONTHS_IN_FORMAT = /D[oD]?(\[[^\[\]]*\]|\s)+MMMM?/,
+        defaultMonthsShortRegex = matchWord,
+        defaultMonthsRegex = matchWord;
+
+    function localeMonths(m, format) {
+        if (!m) {
+            return isArray(this._months)
+                ? this._months
+                : this._months['standalone'];
+        }
+        return isArray(this._months)
+            ? this._months[m.month()]
+            : this._months[
+                  (this._months.isFormat || MONTHS_IN_FORMAT).test(format)
+                      ? 'format'
+                      : 'standalone'
+              ][m.month()];
+    }
+
+    function localeMonthsShort(m, format) {
+        if (!m) {
+            return isArray(this._monthsShort)
+                ? this._monthsShort
+                : this._monthsShort['standalone'];
+        }
+        return isArray(this._monthsShort)
+            ? this._monthsShort[m.month()]
+            : this._monthsShort[
+                  MONTHS_IN_FORMAT.test(format) ? 'format' : 'standalone'
+              ][m.month()];
+    }
+
+    function handleStrictParse(monthName, format, strict) {
+        var i,
+            ii,
+            mom,
+            llc = monthName.toLocaleLowerCase();
+        if (!this._monthsParse) {
+            // this is not used
+            this._monthsParse = [];
+            this._longMonthsParse = [];
+            this._shortMonthsParse = [];
+            for (i = 0; i < 12; ++i) {
+                mom = createUTC([2000, i]);
+                this._shortMonthsParse[i] = this.monthsShort(
+                    mom,
+                    ''
+                ).toLocaleLowerCase();
+                this._longMonthsParse[i] = this.months(mom, '').toLocaleLowerCase();
+            }
+        }
+
+        if (strict) {
+            if (format === 'MMM') {
+                ii = indexOf.call(this._shortMonthsParse, llc);
+                return ii !== -1 ? ii : null;
+            } else {
+                ii = indexOf.call(this._longMonthsParse, llc);
+                return ii !== -1 ? ii : null;
+            }
+        } else {
+            if (format === 'MMM') {
+                ii = indexOf.call(this._shortMonthsParse, llc);
+                if (ii !== -1) {
+                    return ii;
+                }
+                ii = indexOf.call(this._longMonthsParse, llc);
+                return ii !== -1 ? ii : null;
+            } else {
+                ii = indexOf.call(this._longMonthsParse, llc);
+                if (ii !== -1) {
+                    return ii;
+                }
+                ii = indexOf.call(this._shortMonthsParse, llc);
+                return ii !== -1 ? ii : null;
+            }
+        }
+    }
+
+    function localeMonthsParse(monthName, format, strict) {
+        var i, mom, regex;
+
+        if (this._monthsParseExact) {
+            return handleStrictParse.call(this, monthName, format, strict);
+        }
+
+        if (!this._monthsParse) {
+            this._monthsParse = [];
+            this._longMonthsParse = [];
+            this._shortMonthsParse = [];
+        }
+
+        // TODO: add sorting
+        // Sorting makes sure if one month (or abbr) is a prefix of another
+        // see sorting in computeMonthsParse
+        for (i = 0; i < 12; i++) {
+            // make the regex if we don't have it already
+            mom = createUTC([2000, i]);
+            if (strict && !this._longMonthsParse[i]) {
+                this._longMonthsParse[i] = new RegExp(
+                    '^' + this.months(mom, '').replace('.', '') + '$',
+                    'i'
+                );
+                this._shortMonthsParse[i] = new RegExp(
+                    '^' + this.monthsShort(mom, '').replace('.', '') + '$',
+                    'i'
+                );
+            }
+            if (!strict && !this._monthsParse[i]) {
+                regex =
+                    '^' + this.months(mom, '') + '|^' + this.monthsShort(mom, '');
+                this._monthsParse[i] = new RegExp(regex.replace('.', ''), 'i');
+            }
+            // test the regex
+            if (
+                strict &&
+                format === 'MMMM' &&
+                this._longMonthsParse[i].test(monthName)
+            ) {
+                return i;
+            } else if (
+                strict &&
+                format === 'MMM' &&
+                this._shortMonthsParse[i].test(monthName)
+            ) {
+                return i;
+            } else if (!strict && this._monthsParse[i].test(monthName)) {
+                return i;
+            }
+        }
+    }
+
+    // MOMENTS
+
+    function setMonth(mom, value) {
+        var dayOfMonth;
+
+        if (!mom.isValid()) {
+            // No op
+            return mom;
+        }
+
+        if (typeof value === 'string') {
+            if (/^\d+$/.test(value)) {
+                value = toInt(value);
+            } else {
+                value = mom.localeData().monthsParse(value);
+                // TODO: Another silent failure?
+                if (!isNumber(value)) {
+                    return mom;
+                }
+            }
+        }
+
+        dayOfMonth = Math.min(mom.date(), daysInMonth(mom.year(), value));
+        mom._d['set' + (mom._isUTC ? 'UTC' : '') + 'Month'](value, dayOfMonth);
+        return mom;
+    }
+
+    function getSetMonth(value) {
+        if (value != null) {
+            setMonth(this, value);
+            hooks.updateOffset(this, true);
+            return this;
+        } else {
+            return get(this, 'Month');
+        }
+    }
+
+    function getDaysInMonth() {
+        return daysInMonth(this.year(), this.month());
+    }
+
+    function monthsShortRegex(isStrict) {
+        if (this._monthsParseExact) {
+            if (!hasOwnProp(this, '_monthsRegex')) {
+                computeMonthsParse.call(this);
+            }
+            if (isStrict) {
+                return this._monthsShortStrictRegex;
+            } else {
+                return this._monthsShortRegex;
+            }
+        } else {
+            if (!hasOwnProp(this, '_monthsShortRegex')) {
+                this._monthsShortRegex = defaultMonthsShortRegex;
+            }
+            return this._monthsShortStrictRegex && isStrict
+                ? this._monthsShortStrictRegex
+                : this._monthsShortRegex;
+        }
+    }
+
+    function monthsRegex(isStrict) {
+        if (this._monthsParseExact) {
+            if (!hasOwnProp(this, '_monthsRegex')) {
+                computeMonthsParse.call(this);
+            }
+            if (isStrict) {
+                return this._monthsStrictRegex;
+            } else {
+                return this._monthsRegex;
+            }
+        } else {
+            if (!hasOwnProp(this, '_monthsRegex')) {
+                this._monthsRegex = defaultMonthsRegex;
+            }
+            return this._monthsStrictRegex && isStrict
+                ? this._monthsStrictRegex
+                : this._monthsRegex;
+        }
+    }
+
+    function computeMonthsParse() {
+        function cmpLenRev(a, b) {
+            return b.length - a.length;
+        }
+
+        var shortPieces = [],
+            longPieces = [],
+            mixedPieces = [],
+            i,
+            mom;
+        for (i = 0; i < 12; i++) {
+            // make the regex if we don't have it already
+            mom = createUTC([2000, i]);
+            shortPieces.push(this.monthsShort(mom, ''));
+            longPieces.push(this.months(mom, ''));
+            mixedPieces.push(this.months(mom, ''));
+            mixedPieces.push(this.monthsShort(mom, ''));
+        }
+        // Sorting makes sure if one month (or abbr) is a prefix of another it
+        // will match the longer piece.
+        shortPieces.sort(cmpLenRev);
+        longPieces.sort(cmpLenRev);
+        mixedPieces.sort(cmpLenRev);
+        for (i = 0; i < 12; i++) {
+            shortPieces[i] = regexEscape(shortPieces[i]);
+            longPieces[i] = regexEscape(longPieces[i]);
+        }
+        for (i = 0; i < 24; i++) {
+            mixedPieces[i] = regexEscape(mixedPieces[i]);
+        }
+
+        this._monthsRegex = new RegExp('^(' + mixedPieces.join('|') + ')', 'i');
+        this._monthsShortRegex = this._monthsRegex;
+        this._monthsStrictRegex = new RegExp(
+            '^(' + longPieces.join('|') + ')',
+            'i'
+        );
+        this._monthsShortStrictRegex = new RegExp(
+            '^(' + shortPieces.join('|') + ')',
+            'i'
+        );
+    }
+
+    // FORMATTING
+
+    addFormatToken('Y', 0, 0, function () {
+        var y = this.year();
+        return y <= 9999 ? zeroFill(y, 4) : '+' + y;
+    });
+
+    addFormatToken(0, ['YY', 2], 0, function () {
+        return this.year() % 100;
+    });
+
+    addFormatToken(0, ['YYYY', 4], 0, 'year');
+    addFormatToken(0, ['YYYYY', 5], 0, 'year');
+    addFormatToken(0, ['YYYYYY', 6, true], 0, 'year');
+
+    // ALIASES
+
+    addUnitAlias('year', 'y');
+
+    // PRIORITIES
+
+    addUnitPriority('year', 1);
+
+    // PARSING
+
+    addRegexToken('Y', matchSigned);
+    addRegexToken('YY', match1to2, match2);
+    addRegexToken('YYYY', match1to4, match4);
+    addRegexToken('YYYYY', match1to6, match6);
+    addRegexToken('YYYYYY', match1to6, match6);
+
+    addParseToken(['YYYYY', 'YYYYYY'], YEAR);
+    addParseToken('YYYY', function (input, array) {
+        array[YEAR] =
+            input.length === 2 ? hooks.parseTwoDigitYear(input) : toInt(input);
+    });
+    addParseToken('YY', function (input, array) {
+        array[YEAR] = hooks.parseTwoDigitYear(input);
+    });
+    addParseToken('Y', function (input, array) {
+        array[YEAR] = parseInt(input, 10);
+    });
+
+    // HELPERS
+
+    function daysInYear(year) {
+        return isLeapYear(year) ? 366 : 365;
+    }
+
+    // HOOKS
+
+    hooks.parseTwoDigitYear = function (input) {
+        return toInt(input) + (toInt(input) > 68 ? 1900 : 2000);
+    };
+
+    // MOMENTS
+
+    var getSetYear = makeGetSet('FullYear', true);
+
+    function getIsLeapYear() {
+        return isLeapYear(this.year());
+    }
+
+    function createDate(y, m, d, h, M, s, ms) {
+        // can't just apply() to create a date:
+        // https://stackoverflow.com/q/181348
+        var date;
+        // the date constructor remaps years 0-99 to 1900-1999
+        if (y < 100 && y >= 0) {
+            // preserve leap years using a full 400 year cycle, then reset
+            date = new Date(y + 400, m, d, h, M, s, ms);
+            if (isFinite(date.getFullYear())) {
+                date.setFullYear(y);
+            }
+        } else {
+            date = new Date(y, m, d, h, M, s, ms);
+        }
+
+        return date;
+    }
+
+    function createUTCDate(y) {
+        var date, args;
+        // the Date.UTC function remaps years 0-99 to 1900-1999
+        if (y < 100 && y >= 0) {
+            args = Array.prototype.slice.call(arguments);
+            // preserve leap years using a full 400 year cycle, then reset
+            args[0] = y + 400;
+            date = new Date(Date.UTC.apply(null, args));
+            if (isFinite(date.getUTCFullYear())) {
+                date.setUTCFullYear(y);
+            }
+        } else {
+            date = new Date(Date.UTC.apply(null, arguments));
+        }
+
+        return date;
+    }
+
+    // start-of-first-week - start-of-year
+    function firstWeekOffset(year, dow, doy) {
+        var // first-week day -- which january is always in the first week (4 for iso, 1 for other)
+            fwd = 7 + dow - doy,
+            // first-week day local weekday -- which local weekday is fwd
+            fwdlw = (7 + createUTCDate(year, 0, fwd).getUTCDay() - dow) % 7;
+
+        return -fwdlw + fwd - 1;
+    }
+
+    // https://en.wikipedia.org/wiki/ISO_week_date#Calculating_a_date_given_the_year.2C_week_number_and_weekday
+    function dayOfYearFromWeeks(year, week, weekday, dow, doy) {
+        var localWeekday = (7 + weekday - dow) % 7,
+            weekOffset = firstWeekOffset(year, dow, doy),
+            dayOfYear = 1 + 7 * (week - 1) + localWeekday + weekOffset,
+            resYear,
+            resDayOfYear;
+
+        if (dayOfYear <= 0) {
+            resYear = year - 1;
+            resDayOfYear = daysInYear(resYear) + dayOfYear;
+        } else if (dayOfYear > daysInYear(year)) {
+            resYear = year + 1;
+            resDayOfYear = dayOfYear - daysInYear(year);
+        } else {
+            resYear = year;
+            resDayOfYear = dayOfYear;
+        }
+
+        return {
+            year: resYear,
+            dayOfYear: resDayOfYear,
+        };
+    }
+
+    function weekOfYear(mom, dow, doy) {
+        var weekOffset = firstWeekOffset(mom.year(), dow, doy),
+            week = Math.floor((mom.dayOfYear() - weekOffset - 1) / 7) + 1,
+            resWeek,
+            resYear;
+
+        if (week < 1) {
+            resYear = mom.year() - 1;
+            resWeek = week + weeksInYear(resYear, dow, doy);
+        } else if (week > weeksInYear(mom.year(), dow, doy)) {
+            resWeek = week - weeksInYear(mom.year(), dow, doy);
+            resYear = mom.year() + 1;
+        } else {
+            resYear = mom.year();
+            resWeek = week;
+        }
+
+        return {
+            week: resWeek,
+            year: resYear,
+        };
+    }
+
+    function weeksInYear(year, dow, doy) {
+        var weekOffset = firstWeekOffset(year, dow, doy),
+            weekOffsetNext = firstWeekOffset(year + 1, dow, doy);
+        return (daysInYear(year) - weekOffset + weekOffsetNext) / 7;
+    }
+
+    // FORMATTING
+
+    addFormatToken('w', ['ww', 2], 'wo', 'week');
+    addFormatToken('W', ['WW', 2], 'Wo', 'isoWeek');
+
+    // ALIASES
+
+    addUnitAlias('week', 'w');
+    addUnitAlias('isoWeek', 'W');
+
+    // PRIORITIES
+
+    addUnitPriority('week', 5);
+    addUnitPriority('isoWeek', 5);
+
+    // PARSING
+
+    addRegexToken('w', match1to2);
+    addRegexToken('ww', match1to2, match2);
+    addRegexToken('W', match1to2);
+    addRegexToken('WW', match1to2, match2);
+
+    addWeekParseToken(['w', 'ww', 'W', 'WW'], function (
+        input,
+        week,
+        config,
+        token
+    ) {
+        week[token.substr(0, 1)] = toInt(input);
+    });
+
+    // HELPERS
+
+    // LOCALES
+
+    function localeWeek(mom) {
+        return weekOfYear(mom, this._week.dow, this._week.doy).week;
+    }
+
+    var defaultLocaleWeek = {
+        dow: 0, // Sunday is the first day of the week.
+        doy: 6, // The week that contains Jan 6th is the first week of the year.
+    };
+
+    function localeFirstDayOfWeek() {
+        return this._week.dow;
+    }
+
+    function localeFirstDayOfYear() {
+        return this._week.doy;
+    }
+
+    // MOMENTS
+
+    function getSetWeek(input) {
+        var week = this.localeData().week(this);
+        return input == null ? week : this.add((input - week) * 7, 'd');
+    }
+
+    function getSetISOWeek(input) {
+        var week = weekOfYear(this, 1, 4).week;
+        return input == null ? week : this.add((input - week) * 7, 'd');
+    }
+
+    // FORMATTING
+
+    addFormatToken('d', 0, 'do', 'day');
+
+    addFormatToken('dd', 0, 0, function (format) {
+        return this.localeData().weekdaysMin(this, format);
+    });
+
+    addFormatToken('ddd', 0, 0, function (format) {
+        return this.localeData().weekdaysShort(this, format);
+    });
+
+    addFormatToken('dddd', 0, 0, function (format) {
+        return this.localeData().weekdays(this, format);
+    });
+
+    addFormatToken('e', 0, 0, 'weekday');
+    addFormatToken('E', 0, 0, 'isoWeekday');
+
+    // ALIASES
+
+    addUnitAlias('day', 'd');
+    addUnitAlias('weekday', 'e');
+    addUnitAlias('isoWeekday', 'E');
+
+    // PRIORITY
+    addUnitPriority('day', 11);
+    addUnitPriority('weekday', 11);
+    addUnitPriority('isoWeekday', 11);
+
+    // PARSING
+
+    addRegexToken('d', match1to2);
+    addRegexToken('e', match1to2);
+    addRegexToken('E', match1to2);
+    addRegexToken('dd', function (isStrict, locale) {
+        return locale.weekdaysMinRegex(isStrict);
+    });
+    addRegexToken('ddd', function (isStrict, locale) {
+        return locale.weekdaysShortRegex(isStrict);
+    });
+    addRegexToken('dddd', function (isStrict, locale) {
+        return locale.weekdaysRegex(isStrict);
+    });
+
+    addWeekParseToken(['dd', 'ddd', 'dddd'], function (input, week, config, token) {
+        var weekday = config._locale.weekdaysParse(input, token, config._strict);
+        // if we didn't get a weekday name, mark the date as invalid
+        if (weekday != null) {
+            week.d = weekday;
+        } else {
+            getParsingFlags(config).invalidWeekday = input;
+        }
+    });
+
+    addWeekParseToken(['d', 'e', 'E'], function (input, week, config, token) {
+        week[token] = toInt(input);
+    });
+
+    // HELPERS
+
+    function parseWeekday(input, locale) {
+        if (typeof input !== 'string') {
+            return input;
+        }
+
+        if (!isNaN(input)) {
+            return parseInt(input, 10);
+        }
+
+        input = locale.weekdaysParse(input);
+        if (typeof input === 'number') {
+            return input;
+        }
+
+        return null;
+    }
+
+    function parseIsoWeekday(input, locale) {
+        if (typeof input === 'string') {
+            return locale.weekdaysParse(input) % 7 || 7;
+        }
+        return isNaN(input) ? null : input;
+    }
+
+    // LOCALES
+    function shiftWeekdays(ws, n) {
+        return ws.slice(n, 7).concat(ws.slice(0, n));
+    }
+
+    var defaultLocaleWeekdays = 'Sunday_Monday_Tuesday_Wednesday_Thursday_Friday_Saturday'.split(
+            '_'
+        ),
+        defaultLocaleWeekdaysShort = 'Sun_Mon_Tue_Wed_Thu_Fri_Sat'.split('_'),
+        defaultLocaleWeekdaysMin = 'Su_Mo_Tu_We_Th_Fr_Sa'.split('_'),
+        defaultWeekdaysRegex = matchWord,
+        defaultWeekdaysShortRegex = matchWord,
+        defaultWeekdaysMinRegex = matchWord;
+
+    function localeWeekdays(m, format) {
+        var weekdays = isArray(this._weekdays)
+            ? this._weekdays
+            : this._weekdays[
+                  m && m !== true && this._weekdays.isFormat.test(format)
+                      ? 'format'
+                      : 'standalone'
+              ];
+        return m === true
+            ? shiftWeekdays(weekdays, this._week.dow)
+            : m
+            ? weekdays[m.day()]
+            : weekdays;
+    }
+
+    function localeWeekdaysShort(m) {
+        return m === true
+            ? shiftWeekdays(this._weekdaysShort, this._week.dow)
+            : m
+            ? this._weekdaysShort[m.day()]
+            : this._weekdaysShort;
+    }
+
+    function localeWeekdaysMin(m) {
+        return m === true
+            ? shiftWeekdays(this._weekdaysMin, this._week.dow)
+            : m
+            ? this._weekdaysMin[m.day()]
+            : this._weekdaysMin;
+    }
+
+    function handleStrictParse$1(weekdayName, format, strict) {
+        var i,
+            ii,
+            mom,
+            llc = weekdayName.toLocaleLowerCase();
+        if (!this._weekdaysParse) {
+            this._weekdaysParse = [];
+            this._shortWeekdaysParse = [];
+            this._minWeekdaysParse = [];
+
+            for (i = 0; i < 7; ++i) {
+                mom = createUTC([2000, 1]).day(i);
+                this._minWeekdaysParse[i] = this.weekdaysMin(
+                    mom,
+                    ''
+                ).toLocaleLowerCase();
+                this._shortWeekdaysParse[i] = this.weekdaysShort(
+                    mom,
+                    ''
+                ).toLocaleLowerCase();
+                this._weekdaysParse[i] = this.weekdays(mom, '').toLocaleLowerCase();
+            }
+        }
+
+        if (strict) {
+            if (format === 'dddd') {
+                ii = indexOf.call(this._weekdaysParse, llc);
+                return ii !== -1 ? ii : null;
+            } else if (format === 'ddd') {
+                ii = indexOf.call(this._shortWeekdaysParse, llc);
+                return ii !== -1 ? ii : null;
+            } else {
+                ii = indexOf.call(this._minWeekdaysParse, llc);
+                return ii !== -1 ? ii : null;
+            }
+        } else {
+            if (format === 'dddd') {
+                ii = indexOf.call(this._weekdaysParse, llc);
+                if (ii !== -1) {
+                    return ii;
+                }
+                ii = indexOf.call(this._shortWeekdaysParse, llc);
+                if (ii !== -1) {
+                    return ii;
+                }
+                ii = indexOf.call(this._minWeekdaysParse, llc);
+                return ii !== -1 ? ii : null;
+            } else if (format === 'ddd') {
+                ii = indexOf.call(this._shortWeekdaysParse, llc);
+                if (ii !== -1) {
+                    return ii;
+                }
+                ii = indexOf.call(this._weekdaysParse, llc);
+                if (ii !== -1) {
+                    return ii;
+                }
+                ii = indexOf.call(this._minWeekdaysParse, llc);
+                return ii !== -1 ? ii : null;
+            } else {
+                ii = indexOf.call(this._minWeekdaysParse, llc);
+                if (ii !== -1) {
+                    return ii;
+                }
+                ii = indexOf.call(this._weekdaysParse, llc);
+                if (ii !== -1) {
+                    return ii;
+                }
+                ii = indexOf.call(this._shortWeekdaysParse, llc);
+                return ii !== -1 ? ii : null;
+            }
+        }
+    }
+
+    function localeWeekdaysParse(weekdayName, format, strict) {
+        var i, mom, regex;
+
+        if (this._weekdaysParseExact) {
+            return handleStrictParse$1.call(this, weekdayName, format, strict);
+        }
+
+        if (!this._weekdaysParse) {
+            this._weekdaysParse = [];
+            this._minWeekdaysParse = [];
+            this._shortWeekdaysParse = [];
+            this._fullWeekdaysParse = [];
+        }
+
+        for (i = 0; i < 7; i++) {
+            // make the regex if we don't have it already
+
+            mom = createUTC([2000, 1]).day(i);
+            if (strict && !this._fullWeekdaysParse[i]) {
+                this._fullWeekdaysParse[i] = new RegExp(
+                    '^' + this.weekdays(mom, '').replace('.', '\\.?') + '$',
+                    'i'
+                );
+                this._shortWeekdaysParse[i] = new RegExp(
+                    '^' + this.weekdaysShort(mom, '').replace('.', '\\.?') + '$',
+                    'i'
+                );
+                this._minWeekdaysParse[i] = new RegExp(
+                    '^' + this.weekdaysMin(mom, '').replace('.', '\\.?') + '$',
+                    'i'
+                );
+            }
+            if (!this._weekdaysParse[i]) {
+                regex =
+                    '^' +
+                    this.weekdays(mom, '') +
+                    '|^' +
+                    this.weekdaysShort(mom, '') +
+                    '|^' +
+                    this.weekdaysMin(mom, '');
+                this._weekdaysParse[i] = new RegExp(regex.replace('.', ''), 'i');
+            }
+            // test the regex
+            if (
+                strict &&
+                format === 'dddd' &&
+                this._fullWeekdaysParse[i].test(weekdayName)
+            ) {
+                return i;
+            } else if (
+                strict &&
+                format === 'ddd' &&
+                this._shortWeekdaysParse[i].test(weekdayName)
+            ) {
+                return i;
+            } else if (
+                strict &&
+                format === 'dd' &&
+                this._minWeekdaysParse[i].test(weekdayName)
+            ) {
+                return i;
+            } else if (!strict && this._weekdaysParse[i].test(weekdayName)) {
+                return i;
+            }
+        }
+    }
+
+    // MOMENTS
+
+    function getSetDayOfWeek(input) {
+        if (!this.isValid()) {
+            return input != null ? this : NaN;
+        }
+        var day = this._isUTC ? this._d.getUTCDay() : this._d.getDay();
+        if (input != null) {
+            input = parseWeekday(input, this.localeData());
+            return this.add(input - day, 'd');
+        } else {
+            return day;
+        }
+    }
+
+    function getSetLocaleDayOfWeek(input) {
+        if (!this.isValid()) {
+            return input != null ? this : NaN;
+        }
+        var weekday = (this.day() + 7 - this.localeData()._week.dow) % 7;
+        return input == null ? weekday : this.add(input - weekday, 'd');
+    }
+
+    function getSetISODayOfWeek(input) {
+        if (!this.isValid()) {
+            return input != null ? this : NaN;
+        }
+
+        // behaves the same as moment#day except
+        // as a getter, returns 7 instead of 0 (1-7 range instead of 0-6)
+        // as a setter, sunday should belong to the previous week.
+
+        if (input != null) {
+            var weekday = parseIsoWeekday(input, this.localeData());
+            return this.day(this.day() % 7 ? weekday : weekday - 7);
+        } else {
+            return this.day() || 7;
+        }
+    }
+
+    function weekdaysRegex(isStrict) {
+        if (this._weekdaysParseExact) {
+            if (!hasOwnProp(this, '_weekdaysRegex')) {
+                computeWeekdaysParse.call(this);
+            }
+            if (isStrict) {
+                return this._weekdaysStrictRegex;
+            } else {
+                return this._weekdaysRegex;
+            }
+        } else {
+            if (!hasOwnProp(this, '_weekdaysRegex')) {
+                this._weekdaysRegex = defaultWeekdaysRegex;
+            }
+            return this._weekdaysStrictRegex && isStrict
+                ? this._weekdaysStrictRegex
+                : this._weekdaysRegex;
+        }
+    }
+
+    function weekdaysShortRegex(isStrict) {
+        if (this._weekdaysParseExact) {
+            if (!hasOwnProp(this, '_weekdaysRegex')) {
+                computeWeekdaysParse.call(this);
+            }
+            if (isStrict) {
+                return this._weekdaysShortStrictRegex;
+            } else {
+                return this._weekdaysShortRegex;
+            }
+        } else {
+            if (!hasOwnProp(this, '_weekdaysShortRegex')) {
+                this._weekdaysShortRegex = defaultWeekdaysShortRegex;
+            }
+            return this._weekdaysShortStrictRegex && isStrict
+                ? this._weekdaysShortStrictRegex
+                : this._weekdaysShortRegex;
+        }
+    }
+
+    function weekdaysMinRegex(isStrict) {
+        if (this._weekdaysParseExact) {
+            if (!hasOwnProp(this, '_weekdaysRegex')) {
+                computeWeekdaysParse.call(this);
+            }
+            if (isStrict) {
+                return this._weekdaysMinStrictRegex;
+            } else {
+                return this._weekdaysMinRegex;
+            }
+        } else {
+            if (!hasOwnProp(this, '_weekdaysMinRegex')) {
+                this._weekdaysMinRegex = defaultWeekdaysMinRegex;
+            }
+            return this._weekdaysMinStrictRegex && isStrict
+                ? this._weekdaysMinStrictRegex
+                : this._weekdaysMinRegex;
+        }
+    }
+
+    function computeWeekdaysParse() {
+        function cmpLenRev(a, b) {
+            return b.length - a.length;
+        }
+
+        var minPieces = [],
+            shortPieces = [],
+            longPieces = [],
+            mixedPieces = [],
+            i,
+            mom,
+            minp,
+            shortp,
+            longp;
+        for (i = 0; i < 7; i++) {
+            // make the regex if we don't have it already
+            mom = createUTC([2000, 1]).day(i);
+            minp = regexEscape(this.weekdaysMin(mom, ''));
+            shortp = regexEscape(this.weekdaysShort(mom, ''));
+            longp = regexEscape(this.weekdays(mom, ''));
+            minPieces.push(minp);
+            shortPieces.push(shortp);
+            longPieces.push(longp);
+            mixedPieces.push(minp);
+            mixedPieces.push(shortp);
+            mixedPieces.push(longp);
+        }
+        // Sorting makes sure if one weekday (or abbr) is a prefix of another it
+        // will match the longer piece.
+        minPieces.sort(cmpLenRev);
+        shortPieces.sort(cmpLenRev);
+        longPieces.sort(cmpLenRev);
+        mixedPieces.sort(cmpLenRev);
+
+        this._weekdaysRegex = new RegExp('^(' + mixedPieces.join('|') + ')', 'i');
+        this._weekdaysShortRegex = this._weekdaysRegex;
+        this._weekdaysMinRegex = this._weekdaysRegex;
+
+        this._weekdaysStrictRegex = new RegExp(
+            '^(' + longPieces.join('|') + ')',
+            'i'
+        );
+        this._weekdaysShortStrictRegex = new RegExp(
+            '^(' + shortPieces.join('|') + ')',
+            'i'
+        );
+        this._weekdaysMinStrictRegex = new RegExp(
+            '^(' + minPieces.join('|') + ')',
+            'i'
+        );
+    }
+
+    // FORMATTING
+
+    function hFormat() {
+        return this.hours() % 12 || 12;
+    }
+
+    function kFormat() {
+        return this.hours() || 24;
+    }
+
+    addFormatToken('H', ['HH', 2], 0, 'hour');
+    addFormatToken('h', ['hh', 2], 0, hFormat);
+    addFormatToken('k', ['kk', 2], 0, kFormat);
+
+    addFormatToken('hmm', 0, 0, function () {
+        return '' + hFormat.apply(this) + zeroFill(this.minutes(), 2);
+    });
+
+    addFormatToken('hmmss', 0, 0, function () {
+        return (
+            '' +
+            hFormat.apply(this) +
+            zeroFill(this.minutes(), 2) +
+            zeroFill(this.seconds(), 2)
+        );
+    });
+
+    addFormatToken('Hmm', 0, 0, function () {
+        return '' + this.hours() + zeroFill(this.minutes(), 2);
+    });
+
+    addFormatToken('Hmmss', 0, 0, function () {
+        return (
+            '' +
+            this.hours() +
+            zeroFill(this.minutes(), 2) +
+            zeroFill(this.seconds(), 2)
+        );
+    });
+
+    function meridiem(token, lowercase) {
+        addFormatToken(token, 0, 0, function () {
+            return this.localeData().meridiem(
+                this.hours(),
+                this.minutes(),
+                lowercase
+            );
+        });
+    }
+
+    meridiem('a', true);
+    meridiem('A', false);
+
+    // ALIASES
+
+    addUnitAlias('hour', 'h');
+
+    // PRIORITY
+    addUnitPriority('hour', 13);
+
+    // PARSING
+
+    function matchMeridiem(isStrict, locale) {
+        return locale._meridiemParse;
+    }
+
+    addRegexToken('a', matchMeridiem);
+    addRegexToken('A', matchMeridiem);
+    addRegexToken('H', match1to2);
+    addRegexToken('h', match1to2);
+    addRegexToken('k', match1to2);
+    addRegexToken('HH', match1to2, match2);
+    addRegexToken('hh', match1to2, match2);
+    addRegexToken('kk', match1to2, match2);
+
+    addRegexToken('hmm', match3to4);
+    addRegexToken('hmmss', match5to6);
+    addRegexToken('Hmm', match3to4);
+    addRegexToken('Hmmss', match5to6);
+
+    addParseToken(['H', 'HH'], HOUR);
+    addParseToken(['k', 'kk'], function (input, array, config) {
+        var kInput = toInt(input);
+        array[HOUR] = kInput === 24 ? 0 : kInput;
+    });
+    addParseToken(['a', 'A'], function (input, array, config) {
+        config._isPm = config._locale.isPM(input);
+        config._meridiem = input;
+    });
+    addParseToken(['h', 'hh'], function (input, array, config) {
+        array[HOUR] = toInt(input);
+        getParsingFlags(config).bigHour = true;
+    });
+    addParseToken('hmm', function (input, array, config) {
+        var pos = input.length - 2;
+        array[HOUR] = toInt(input.substr(0, pos));
+        array[MINUTE] = toInt(input.substr(pos));
+        getParsingFlags(config).bigHour = true;
+    });
+    addParseToken('hmmss', function (input, array, config) {
+        var pos1 = input.length - 4,
+            pos2 = input.length - 2;
+        array[HOUR] = toInt(input.substr(0, pos1));
+        array[MINUTE] = toInt(input.substr(pos1, 2));
+        array[SECOND] = toInt(input.substr(pos2));
+        getParsingFlags(config).bigHour = true;
+    });
+    addParseToken('Hmm', function (input, array, config) {
+        var pos = input.length - 2;
+        array[HOUR] = toInt(input.substr(0, pos));
+        array[MINUTE] = toInt(input.substr(pos));
+    });
+    addParseToken('Hmmss', function (input, array, config) {
+        var pos1 = input.length - 4,
+            pos2 = input.length - 2;
+        array[HOUR] = toInt(input.substr(0, pos1));
+        array[MINUTE] = toInt(input.substr(pos1, 2));
+        array[SECOND] = toInt(input.substr(pos2));
+    });
+
+    // LOCALES
+
+    function localeIsPM(input) {
+        // IE8 Quirks Mode & IE7 Standards Mode do not allow accessing strings like arrays
+        // Using charAt should be more compatible.
+        return (input + '').toLowerCase().charAt(0) === 'p';
+    }
+
+    var defaultLocaleMeridiemParse = /[ap]\.?m?\.?/i,
+        // Setting the hour should keep the time, because the user explicitly
+        // specified which hour they want. So trying to maintain the same hour (in
+        // a new timezone) makes sense. Adding/subtracting hours does not follow
+        // this rule.
+        getSetHour = makeGetSet('Hours', true);
+
+    function localeMeridiem(hours, minutes, isLower) {
+        if (hours > 11) {
+            return isLower ? 'pm' : 'PM';
+        } else {
+            return isLower ? 'am' : 'AM';
+        }
+    }
+
+    var baseConfig = {
+        calendar: defaultCalendar,
+        longDateFormat: defaultLongDateFormat,
+        invalidDate: defaultInvalidDate,
+        ordinal: defaultOrdinal,
+        dayOfMonthOrdinalParse: defaultDayOfMonthOrdinalParse,
+        relativeTime: defaultRelativeTime,
+
+        months: defaultLocaleMonths,
+        monthsShort: defaultLocaleMonthsShort,
+
+        week: defaultLocaleWeek,
+
+        weekdays: defaultLocaleWeekdays,
+        weekdaysMin: defaultLocaleWeekdaysMin,
+        weekdaysShort: defaultLocaleWeekdaysShort,
+
+        meridiemParse: defaultLocaleMeridiemParse,
+    };
+
+    // internal storage for locale config files
+    var locales = {},
+        localeFamilies = {},
+        globalLocale;
+
+    function commonPrefix(arr1, arr2) {
+        var i,
+            minl = Math.min(arr1.length, arr2.length);
+        for (i = 0; i < minl; i += 1) {
+            if (arr1[i] !== arr2[i]) {
+                return i;
+            }
+        }
+        return minl;
+    }
+
+    function normalizeLocale(key) {
+        return key ? key.toLowerCase().replace('_', '-') : key;
+    }
+
+    // pick the locale from the array
+    // try ['en-au', 'en-gb'] as 'en-au', 'en-gb', 'en', as in move through the list trying each
+    // substring from most specific to least, but move to the next array item if it's a more specific variant than the current root
+    function chooseLocale(names) {
+        var i = 0,
+            j,
+            next,
+            locale,
+            split;
+
+        while (i < names.length) {
+            split = normalizeLocale(names[i]).split('-');
+            j = split.length;
+            next = normalizeLocale(names[i + 1]);
+            next = next ? next.split('-') : null;
+            while (j > 0) {
+                locale = loadLocale(split.slice(0, j).join('-'));
+                if (locale) {
+                    return locale;
+                }
+                if (
+                    next &&
+                    next.length >= j &&
+                    commonPrefix(split, next) >= j - 1
+                ) {
+                    //the next array item is better than a shallower substring of this one
+                    break;
+                }
+                j--;
+            }
+            i++;
+        }
+        return globalLocale;
+    }
+
+    function loadLocale(name) {
+        var oldLocale = null,
+            aliasedRequire;
+        // TODO: Find a better way to register and load all the locales in Node
+        if (
+            locales[name] === undefined &&
+            typeof module !== 'undefined' &&
+            module &&
+            module.exports
+        ) {
+            try {
+                oldLocale = globalLocale._abbr;
+                aliasedRequire = require;
+                aliasedRequire('./locale/' + name);
+                getSetGlobalLocale(oldLocale);
+            } catch (e) {
+                // mark as not found to avoid repeating expensive file require call causing high CPU
+                // when trying to find en-US, en_US, en-us for every format call
+                locales[name] = null; // null means not found
+            }
+        }
+        return locales[name];
+    }
+
+    // This function will load locale and then set the global locale.  If
+    // no arguments are passed in, it will simply return the current global
+    // locale key.
+    function getSetGlobalLocale(key, values) {
+        var data;
+        if (key) {
+            if (isUndefined(values)) {
+                data = getLocale(key);
+            } else {
+                data = defineLocale(key, values);
+            }
+
+            if (data) {
+                // moment.duration._locale = moment._locale = data;
+                globalLocale = data;
+            } else {
+                if (typeof console !== 'undefined' && console.warn) {
+                    //warn user if arguments are passed but the locale could not be set
+                    console.warn(
+                        'Locale ' + key + ' not found. Did you forget to load it?'
+                    );
+                }
+            }
+        }
+
+        return globalLocale._abbr;
+    }
+
+    function defineLocale(name, config) {
+        if (config !== null) {
+            var locale,
+                parentConfig = baseConfig;
+            config.abbr = name;
+            if (locales[name] != null) {
+                deprecateSimple(
+                    'defineLocaleOverride',
+                    'use moment.updateLocale(localeName, config) to change ' +
+                        'an existing locale. moment.defineLocale(localeName, ' +
+                        'config) should only be used for creating a new locale ' +
+                        'See http://momentjs.com/guides/#/warnings/define-locale/ for more info.'
+                );
+                parentConfig = locales[name]._config;
+            } else if (config.parentLocale != null) {
+                if (locales[config.parentLocale] != null) {
+                    parentConfig = locales[config.parentLocale]._config;
+                } else {
+                    locale = loadLocale(config.parentLocale);
+                    if (locale != null) {
+                        parentConfig = locale._config;
+                    } else {
+                        if (!localeFamilies[config.parentLocale]) {
+                            localeFamilies[config.parentLocale] = [];
+                        }
+                        localeFamilies[config.parentLocale].push({
+                            name: name,
+                            config: config,
+                        });
+                        return null;
+                    }
+                }
+            }
+            locales[name] = new Locale(mergeConfigs(parentConfig, config));
+
+            if (localeFamilies[name]) {
+                localeFamilies[name].forEach(function (x) {
+                    defineLocale(x.name, x.config);
+                });
+            }
+
+            // backwards compat for now: also set the locale
+            // make sure we set the locale AFTER all child locales have been
+            // created, so we won't end up with the child locale set.
+            getSetGlobalLocale(name);
+
+            return locales[name];
+        } else {
+            // useful for testing
+            delete locales[name];
+            return null;
+        }
+    }
+
+    function updateLocale(name, config) {
+        if (config != null) {
+            var locale,
+                tmpLocale,
+                parentConfig = baseConfig;
+
+            if (locales[name] != null && locales[name].parentLocale != null) {
+                // Update existing child locale in-place to avoid memory-leaks
+                locales[name].set(mergeConfigs(locales[name]._config, config));
+            } else {
+                // MERGE
+                tmpLocale = loadLocale(name);
+                if (tmpLocale != null) {
+                    parentConfig = tmpLocale._config;
+                }
+                config = mergeConfigs(parentConfig, config);
+                if (tmpLocale == null) {
+                    // updateLocale is called for creating a new locale
+                    // Set abbr so it will have a name (getters return
+                    // undefined otherwise).
+                    config.abbr = name;
+                }
+                locale = new Locale(config);
+                locale.parentLocale = locales[name];
+                locales[name] = locale;
+            }
+
+            // backwards compat for now: also set the locale
+            getSetGlobalLocale(name);
+        } else {
+            // pass null for config to unupdate, useful for tests
+            if (locales[name] != null) {
+                if (locales[name].parentLocale != null) {
+                    locales[name] = locales[name].parentLocale;
+                    if (name === getSetGlobalLocale()) {
+                        getSetGlobalLocale(name);
+                    }
+                } else if (locales[name] != null) {
+                    delete locales[name];
+                }
+            }
+        }
+        return locales[name];
+    }
+
+    // returns locale data
+    function getLocale(key) {
+        var locale;
+
+        if (key && key._locale && key._locale._abbr) {
+            key = key._locale._abbr;
+        }
+
+        if (!key) {
+            return globalLocale;
+        }
+
+        if (!isArray(key)) {
+            //short-circuit everything else
+            locale = loadLocale(key);
+            if (locale) {
+                return locale;
+            }
+            key = [key];
+        }
+
+        return chooseLocale(key);
+    }
+
+    function listLocales() {
+        return keys(locales);
+    }
+
+    function checkOverflow(m) {
+        var overflow,
+            a = m._a;
+
+        if (a && getParsingFlags(m).overflow === -2) {
+            overflow =
+                a[MONTH] < 0 || a[MONTH] > 11
+                    ? MONTH
+                    : a[DATE] < 1 || a[DATE] > daysInMonth(a[YEAR], a[MONTH])
+                    ? DATE
+                    : a[HOUR] < 0 ||
+                      a[HOUR] > 24 ||
+                      (a[HOUR] === 24 &&
+                          (a[MINUTE] !== 0 ||
+                              a[SECOND] !== 0 ||
+                              a[MILLISECOND] !== 0))
+                    ? HOUR
+                    : a[MINUTE] < 0 || a[MINUTE] > 59
+                    ? MINUTE
+                    : a[SECOND] < 0 || a[SECOND] > 59
+                    ? SECOND
+                    : a[MILLISECOND] < 0 || a[MILLISECOND] > 999
+                    ? MILLISECOND
+                    : -1;
+
+            if (
+                getParsingFlags(m)._overflowDayOfYear &&
+                (overflow < YEAR || overflow > DATE)
+            ) {
+                overflow = DATE;
+            }
+            if (getParsingFlags(m)._overflowWeeks && overflow === -1) {
+                overflow = WEEK;
+            }
+            if (getParsingFlags(m)._overflowWeekday && overflow === -1) {
+                overflow = WEEKDAY;
+            }
+
+            getParsingFlags(m).overflow = overflow;
+        }
+
+        return m;
+    }
+
+    // iso 8601 regex
+    // 0000-00-00 0000-W00 or 0000-W00-0 + T + 00 or 00:00 or 00:00:00 or 00:00:00.000 + +00:00 or +0000 or +00)
+    var extendedIsoRegex = /^\s*((?:[+-]\d{6}|\d{4})-(?:\d\d-\d\d|W\d\d-\d|W\d\d|\d\d\d|\d\d))(?:(T| )(\d\d(?::\d\d(?::\d\d(?:[.,]\d+)?)?)?)([+-]\d\d(?::?\d\d)?|\s*Z)?)?$/,
+        basicIsoRegex = /^\s*((?:[+-]\d{6}|\d{4})(?:\d\d\d\d|W\d\d\d|W\d\d|\d\d\d|\d\d|))(?:(T| )(\d\d(?:\d\d(?:\d\d(?:[.,]\d+)?)?)?)([+-]\d\d(?::?\d\d)?|\s*Z)?)?$/,
+        tzRegex = /Z|[+-]\d\d(?::?\d\d)?/,
+        isoDates = [
+            ['YYYYYY-MM-DD', /[+-]\d{6}-\d\d-\d\d/],
+            ['YYYY-MM-DD', /\d{4}-\d\d-\d\d/],
+            ['GGGG-[W]WW-E', /\d{4}-W\d\d-\d/],
+            ['GGGG-[W]WW', /\d{4}-W\d\d/, false],
+            ['YYYY-DDD', /\d{4}-\d{3}/],
+            ['YYYY-MM', /\d{4}-\d\d/, false],
+            ['YYYYYYMMDD', /[+-]\d{10}/],
+            ['YYYYMMDD', /\d{8}/],
+            ['GGGG[W]WWE', /\d{4}W\d{3}/],
+            ['GGGG[W]WW', /\d{4}W\d{2}/, false],
+            ['YYYYDDD', /\d{7}/],
+            ['YYYYMM', /\d{6}/, false],
+            ['YYYY', /\d{4}/, false],
+        ],
+        // iso time formats and regexes
+        isoTimes = [
+            ['HH:mm:ss.SSSS', /\d\d:\d\d:\d\d\.\d+/],
+            ['HH:mm:ss,SSSS', /\d\d:\d\d:\d\d,\d+/],
+            ['HH:mm:ss', /\d\d:\d\d:\d\d/],
+            ['HH:mm', /\d\d:\d\d/],
+            ['HHmmss.SSSS', /\d\d\d\d\d\d\.\d+/],
+            ['HHmmss,SSSS', /\d\d\d\d\d\d,\d+/],
+            ['HHmmss', /\d\d\d\d\d\d/],
+            ['HHmm', /\d\d\d\d/],
+            ['HH', /\d\d/],
+        ],
+        aspNetJsonRegex = /^\/?Date\((-?\d+)/i,
+        // RFC 2822 regex: For details see https://tools.ietf.org/html/rfc2822#section-3.3
+        rfc2822 = /^(?:(Mon|Tue|Wed|Thu|Fri|Sat|Sun),?\s)?(\d{1,2})\s(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s(\d{2,4})\s(\d\d):(\d\d)(?::(\d\d))?\s(?:(UT|GMT|[ECMP][SD]T)|([Zz])|([+-]\d{4}))$/,
+        obsOffsets = {
+            UT: 0,
+            GMT: 0,
+            EDT: -4 * 60,
+            EST: -5 * 60,
+            CDT: -5 * 60,
+            CST: -6 * 60,
+            MDT: -6 * 60,
+            MST: -7 * 60,
+            PDT: -7 * 60,
+            PST: -8 * 60,
+        };
+
+    // date from iso format
+    function configFromISO(config) {
+        var i,
+            l,
+            string = config._i,
+            match = extendedIsoRegex.exec(string) || basicIsoRegex.exec(string),
+            allowTime,
+            dateFormat,
+            timeFormat,
+            tzFormat;
+
+        if (match) {
+            getParsingFlags(config).iso = true;
+
+            for (i = 0, l = isoDates.length; i < l; i++) {
+                if (isoDates[i][1].exec(match[1])) {
+                    dateFormat = isoDates[i][0];
+                    allowTime = isoDates[i][2] !== false;
+                    break;
+                }
+            }
+            if (dateFormat == null) {
+                config._isValid = false;
+                return;
+            }
+            if (match[3]) {
+                for (i = 0, l = isoTimes.length; i < l; i++) {
+                    if (isoTimes[i][1].exec(match[3])) {
+                        // match[2] should be 'T' or space
+                        timeFormat = (match[2] || ' ') + isoTimes[i][0];
+                        break;
+                    }
+                }
+                if (timeFormat == null) {
+                    config._isValid = false;
+                    return;
+                }
+            }
+            if (!allowTime && timeFormat != null) {
+                config._isValid = false;
+                return;
+            }
+            if (match[4]) {
+                if (tzRegex.exec(match[4])) {
+                    tzFormat = 'Z';
+                } else {
+                    config._isValid = false;
+                    return;
+                }
+            }
+            config._f = dateFormat + (timeFormat || '') + (tzFormat || '');
+            configFromStringAndFormat(config);
+        } else {
+            config._isValid = false;
+        }
+    }
+
+    function extractFromRFC2822Strings(
+        yearStr,
+        monthStr,
+        dayStr,
+        hourStr,
+        minuteStr,
+        secondStr
+    ) {
+        var result = [
+            untruncateYear(yearStr),
+            defaultLocaleMonthsShort.indexOf(monthStr),
+            parseInt(dayStr, 10),
+            parseInt(hourStr, 10),
+            parseInt(minuteStr, 10),
+        ];
+
+        if (secondStr) {
+            result.push(parseInt(secondStr, 10));
+        }
+
+        return result;
+    }
+
+    function untruncateYear(yearStr) {
+        var year = parseInt(yearStr, 10);
+        if (year <= 49) {
+            return 2000 + year;
+        } else if (year <= 999) {
+            return 1900 + year;
+        }
+        return year;
+    }
+
+    function preprocessRFC2822(s) {
+        // Remove comments and folding whitespace and replace multiple-spaces with a single space
+        return s
+            .replace(/\([^)]*\)|[\n\t]/g, ' ')
+            .replace(/(\s\s+)/g, ' ')
+            .replace(/^\s\s*/, '')
+            .replace(/\s\s*$/, '');
+    }
+
+    function checkWeekday(weekdayStr, parsedInput, config) {
+        if (weekdayStr) {
+            // TODO: Replace the vanilla JS Date object with an independent day-of-week check.
+            var weekdayProvided = defaultLocaleWeekdaysShort.indexOf(weekdayStr),
+                weekdayActual = new Date(
+                    parsedInput[0],
+                    parsedInput[1],
+                    parsedInput[2]
+                ).getDay();
+            if (weekdayProvided !== weekdayActual) {
+                getParsingFlags(config).weekdayMismatch = true;
+                config._isValid = false;
+                return false;
+            }
+        }
+        return true;
+    }
+
+    function calculateOffset(obsOffset, militaryOffset, numOffset) {
+        if (obsOffset) {
+            return obsOffsets[obsOffset];
+        } else if (militaryOffset) {
+            // the only allowed military tz is Z
+            return 0;
+        } else {
+            var hm = parseInt(numOffset, 10),
+                m = hm % 100,
+                h = (hm - m) / 100;
+            return h * 60 + m;
+        }
+    }
+
+    // date and time from ref 2822 format
+    function configFromRFC2822(config) {
+        var match = rfc2822.exec(preprocessRFC2822(config._i)),
+            parsedArray;
+        if (match) {
+            parsedArray = extractFromRFC2822Strings(
+                match[4],
+                match[3],
+                match[2],
+                match[5],
+                match[6],
+                match[7]
+            );
+            if (!checkWeekday(match[1], parsedArray, config)) {
+                return;
+            }
+
+            config._a = parsedArray;
+            config._tzm = calculateOffset(match[8], match[9], match[10]);
+
+            config._d = createUTCDate.apply(null, config._a);
+            config._d.setUTCMinutes(config._d.getUTCMinutes() - config._tzm);
+
+            getParsingFlags(config).rfc2822 = true;
+        } else {
+            config._isValid = false;
+        }
+    }
+
+    // date from 1) ASP.NET, 2) ISO, 3) RFC 2822 formats, or 4) optional fallback if parsing isn't strict
+    function configFromString(config) {
+        var matched = aspNetJsonRegex.exec(config._i);
+        if (matched !== null) {
+            config._d = new Date(+matched[1]);
+            return;
+        }
+
+        configFromISO(config);
+        if (config._isValid === false) {
+            delete config._isValid;
+        } else {
+            return;
+        }
+
+        configFromRFC2822(config);
+        if (config._isValid === false) {
+            delete config._isValid;
+        } else {
+            return;
+        }
+
+        if (config._strict) {
+            config._isValid = false;
+        } else {
+            // Final attempt, use Input Fallback
+            hooks.createFromInputFallback(config);
+        }
+    }
+
+    hooks.createFromInputFallback = deprecate(
+        'value provided is not in a recognized RFC2822 or ISO format. moment construction falls back to js Date(), ' +
+            'which is not reliable across all browsers and versions. Non RFC2822/ISO date formats are ' +
+            'discouraged. Please refer to http://momentjs.com/guides/#/warnings/js-date/ for more info.',
+        function (config) {
+            config._d = new Date(config._i + (config._useUTC ? ' UTC' : ''));
+        }
+    );
+
+    // Pick the first defined of two or three arguments.
+    function defaults(a, b, c) {
+        if (a != null) {
+            return a;
+        }
+        if (b != null) {
+            return b;
+        }
+        return c;
+    }
+
+    function currentDateArray(config) {
+        // hooks is actually the exported moment object
+        var nowValue = new Date(hooks.now());
+        if (config._useUTC) {
+            return [
+                nowValue.getUTCFullYear(),
+                nowValue.getUTCMonth(),
+                nowValue.getUTCDate(),
+            ];
+        }
+        return [nowValue.getFullYear(), nowValue.getMonth(), nowValue.getDate()];
+    }
+
+    // convert an array to a date.
+    // the array should mirror the parameters below
+    // note: all values past the year are optional and will default to the lowest possible value.
+    // [year, month, day , hour, minute, second, millisecond]
+    function configFromArray(config) {
+        var i,
+            date,
+            input = [],
+            currentDate,
+            expectedWeekday,
+            yearToUse;
+
+        if (config._d) {
+            return;
+        }
+
+        currentDate = currentDateArray(config);
+
+        //compute day of the year from weeks and weekdays
+        if (config._w && config._a[DATE] == null && config._a[MONTH] == null) {
+            dayOfYearFromWeekInfo(config);
+        }
+
+        //if the day of the year is set, figure out what it is
+        if (config._dayOfYear != null) {
+            yearToUse = defaults(config._a[YEAR], currentDate[YEAR]);
+
+            if (
+                config._dayOfYear > daysInYear(yearToUse) ||
+                config._dayOfYear === 0
+            ) {
+                getParsingFlags(config)._overflowDayOfYear = true;
+            }
+
+            date = createUTCDate(yearToUse, 0, config._dayOfYear);
+            config._a[MONTH] = date.getUTCMonth();
+            config._a[DATE] = date.getUTCDate();
+        }
+
+        // Default to current date.
+        // * if no year, month, day of month are given, default to today
+        // * if day of month is given, default month and year
+        // * if month is given, default only year
+        // * if year is given, don't default anything
+        for (i = 0; i < 3 && config._a[i] == null; ++i) {
+            config._a[i] = input[i] = currentDate[i];
+        }
+
+        // Zero out whatever was not defaulted, including time
+        for (; i < 7; i++) {
+            config._a[i] = input[i] =
+                config._a[i] == null ? (i === 2 ? 1 : 0) : config._a[i];
+        }
+
+        // Check for 24:00:00.000
+        if (
+            config._a[HOUR] === 24 &&
+            config._a[MINUTE] === 0 &&
+            config._a[SECOND] === 0 &&
+            config._a[MILLISECOND] === 0
+        ) {
+            config._nextDay = true;
+            config._a[HOUR] = 0;
+        }
+
+        config._d = (config._useUTC ? createUTCDate : createDate).apply(
+            null,
+            input
+        );
+        expectedWeekday = config._useUTC
+            ? config._d.getUTCDay()
+            : config._d.getDay();
+
+        // Apply timezone offset from input. The actual utcOffset can be changed
+        // with parseZone.
+        if (config._tzm != null) {
+            config._d.setUTCMinutes(config._d.getUTCMinutes() - config._tzm);
+        }
+
+        if (config._nextDay) {
+            config._a[HOUR] = 24;
+        }
+
+        // check for mismatching day of week
+        if (
+            config._w &&
+            typeof config._w.d !== 'undefined' &&
+            config._w.d !== expectedWeekday
+        ) {
+            getParsingFlags(config).weekdayMismatch = true;
+        }
+    }
+
+    function dayOfYearFromWeekInfo(config) {
+        var w, weekYear, week, weekday, dow, doy, temp, weekdayOverflow, curWeek;
+
+        w = config._w;
+        if (w.GG != null || w.W != null || w.E != null) {
+            dow = 1;
+            doy = 4;
+
+            // TODO: We need to take the current isoWeekYear, but that depends on
+            // how we interpret now (local, utc, fixed offset). So create
+            // a now version of current config (take local/utc/offset flags, and
+            // create now).
+            weekYear = defaults(
+                w.GG,
+                config._a[YEAR],
+                weekOfYear(createLocal(), 1, 4).year
+            );
+            week = defaults(w.W, 1);
+            weekday = defaults(w.E, 1);
+            if (weekday < 1 || weekday > 7) {
+                weekdayOverflow = true;
+            }
+        } else {
+            dow = config._locale._week.dow;
+            doy = config._locale._week.doy;
+
+            curWeek = weekOfYear(createLocal(), dow, doy);
+
+            weekYear = defaults(w.gg, config._a[YEAR], curWeek.year);
+
+            // Default to current week.
+            week = defaults(w.w, curWeek.week);
+
+            if (w.d != null) {
+                // weekday -- low day numbers are considered next week
+                weekday = w.d;
+                if (weekday < 0 || weekday > 6) {
+                    weekdayOverflow = true;
+                }
+            } else if (w.e != null) {
+                // local weekday -- counting starts from beginning of week
+                weekday = w.e + dow;
+                if (w.e < 0 || w.e > 6) {
+                    weekdayOverflow = true;
+                }
+            } else {
+                // default to beginning of week
+                weekday = dow;
+            }
+        }
+        if (week < 1 || week > weeksInYear(weekYear, dow, doy)) {
+            getParsingFlags(config)._overflowWeeks = true;
+        } else if (weekdayOverflow != null) {
+            getParsingFlags(config)._overflowWeekday = true;
+        } else {
+            temp = dayOfYearFromWeeks(weekYear, week, weekday, dow, doy);
+            config._a[YEAR] = temp.year;
+            config._dayOfYear = temp.dayOfYear;
+        }
+    }
+
+    // constant that refers to the ISO standard
+    hooks.ISO_8601 = function () {};
+
+    // constant that refers to the RFC 2822 form
+    hooks.RFC_2822 = function () {};
+
+    // date from string and format string
+    function configFromStringAndFormat(config) {
+        // TODO: Move this to another part of the creation flow to prevent circular deps
+        if (config._f === hooks.ISO_8601) {
+            configFromISO(config);
+            return;
+        }
+        if (config._f === hooks.RFC_2822) {
+            configFromRFC2822(config);
+            return;
+        }
+        config._a = [];
+        getParsingFlags(config).empty = true;
+
+        // This array is used to make a Date, either with `new Date` or `Date.UTC`
+        var string = '' + config._i,
+            i,
+            parsedInput,
+            tokens,
+            token,
+            skipped,
+            stringLength = string.length,
+            totalParsedInputLength = 0,
+            era;
+
+        tokens =
+            expandFormat(config._f, config._locale).match(formattingTokens) || [];
+
+        for (i = 0; i < tokens.length; i++) {
+            token = tokens[i];
+            parsedInput = (string.match(getParseRegexForToken(token, config)) ||
+                [])[0];
+            if (parsedInput) {
+                skipped = string.substr(0, string.indexOf(parsedInput));
+                if (skipped.length > 0) {
+                    getParsingFlags(config).unusedInput.push(skipped);
+                }
+                string = string.slice(
+                    string.indexOf(parsedInput) + parsedInput.length
+                );
+                totalParsedInputLength += parsedInput.length;
+            }
+            // don't parse if it's not a known token
+            if (formatTokenFunctions[token]) {
+                if (parsedInput) {
+                    getParsingFlags(config).empty = false;
+                } else {
+                    getParsingFlags(config).unusedTokens.push(token);
+                }
+                addTimeToArrayFromToken(token, parsedInput, config);
+            } else if (config._strict && !parsedInput) {
+                getParsingFlags(config).unusedTokens.push(token);
+            }
+        }
+
+        // add remaining unparsed input length to the string
+        getParsingFlags(config).charsLeftOver =
+            stringLength - totalParsedInputLength;
+        if (string.length > 0) {
+            getParsingFlags(config).unusedInput.push(string);
+        }
+
+        // clear _12h flag if hour is <= 12
+        if (
+            config._a[HOUR] <= 12 &&
+            getParsingFlags(config).bigHour === true &&
+            config._a[HOUR] > 0
+        ) {
+            getParsingFlags(config).bigHour = undefined;
+        }
+
+        getParsingFlags(config).parsedDateParts = config._a.slice(0);
+        getParsingFlags(config).meridiem = config._meridiem;
+        // handle meridiem
+        config._a[HOUR] = meridiemFixWrap(
+            config._locale,
+            config._a[HOUR],
+            config._meridiem
+        );
+
+        // handle era
+        era = getParsingFlags(config).era;
+        if (era !== null) {
+            config._a[YEAR] = config._locale.erasConvertYear(era, config._a[YEAR]);
+        }
+
+        configFromArray(config);
+        checkOverflow(config);
+    }
+
+    function meridiemFixWrap(locale, hour, meridiem) {
+        var isPm;
+
+        if (meridiem == null) {
+            // nothing to do
+            return hour;
+        }
+        if (locale.meridiemHour != null) {
+            return locale.meridiemHour(hour, meridiem);
+        } else if (locale.isPM != null) {
+            // Fallback
+            isPm = locale.isPM(meridiem);
+            if (isPm && hour < 12) {
+                hour += 12;
+            }
+            if (!isPm && hour === 12) {
+                hour = 0;
+            }
+            return hour;
+        } else {
+            // this is not supposed to happen
+            return hour;
+        }
+    }
+
+    // date from string and array of format strings
+    function configFromStringAndArray(config) {
+        var tempConfig,
+            bestMoment,
+            scoreToBeat,
+            i,
+            currentScore,
+            validFormatFound,
+            bestFormatIsValid = false;
+
+        if (config._f.length === 0) {
+            getParsingFlags(config).invalidFormat = true;
+            config._d = new Date(NaN);
+            return;
+        }
+
+        for (i = 0; i < config._f.length; i++) {
+            currentScore = 0;
+            validFormatFound = false;
+            tempConfig = copyConfig({}, config);
+            if (config._useUTC != null) {
+                tempConfig._useUTC = config._useUTC;
+            }
+            tempConfig._f = config._f[i];
+            configFromStringAndFormat(tempConfig);
+
+            if (isValid(tempConfig)) {
+                validFormatFound = true;
+            }
+
+            // if there is any input that was not parsed add a penalty for that format
+            currentScore += getParsingFlags(tempConfig).charsLeftOver;
+
+            //or tokens
+            currentScore += getParsingFlags(tempConfig).unusedTokens.length * 10;
+
+            getParsingFlags(tempConfig).score = currentScore;
+
+            if (!bestFormatIsValid) {
+                if (
+                    scoreToBeat == null ||
+                    currentScore < scoreToBeat ||
+                    validFormatFound
+                ) {
+                    scoreToBeat = currentScore;
+                    bestMoment = tempConfig;
+                    if (validFormatFound) {
+                        bestFormatIsValid = true;
+                    }
+                }
+            } else {
+                if (currentScore < scoreToBeat) {
+                    scoreToBeat = currentScore;
+                    bestMoment = tempConfig;
+                }
+            }
+        }
+
+        extend(config, bestMoment || tempConfig);
+    }
+
+    function configFromObject(config) {
+        if (config._d) {
+            return;
+        }
+
+        var i = normalizeObjectUnits(config._i),
+            dayOrDate = i.day === undefined ? i.date : i.day;
+        config._a = map(
+            [i.year, i.month, dayOrDate, i.hour, i.minute, i.second, i.millisecond],
+            function (obj) {
+                return obj && parseInt(obj, 10);
+            }
+        );
+
+        configFromArray(config);
+    }
+
+    function createFromConfig(config) {
+        var res = new Moment(checkOverflow(prepareConfig(config)));
+        if (res._nextDay) {
+            // Adding is smart enough around DST
+            res.add(1, 'd');
+            res._nextDay = undefined;
+        }
+
+        return res;
+    }
+
+    function prepareConfig(config) {
+        var input = config._i,
+            format = config._f;
+
+        config._locale = config._locale || getLocale(config._l);
+
+        if (input === null || (format === undefined && input === '')) {
+            return createInvalid({ nullInput: true });
+        }
+
+        if (typeof input === 'string') {
+            config._i = input = config._locale.preparse(input);
+        }
+
+        if (isMoment(input)) {
+            return new Moment(checkOverflow(input));
+        } else if (isDate(input)) {
+            config._d = input;
+        } else if (isArray(format)) {
+            configFromStringAndArray(config);
+        } else if (format) {
+            configFromStringAndFormat(config);
+        } else {
+            configFromInput(config);
+        }
+
+        if (!isValid(config)) {
+            config._d = null;
+        }
+
+        return config;
+    }
+
+    function configFromInput(config) {
+        var input = config._i;
+        if (isUndefined(input)) {
+            config._d = new Date(hooks.now());
+        } else if (isDate(input)) {
+            config._d = new Date(input.valueOf());
+        } else if (typeof input === 'string') {
+            configFromString(config);
+        } else if (isArray(input)) {
+            config._a = map(input.slice(0), function (obj) {
+                return parseInt(obj, 10);
+            });
+            configFromArray(config);
+        } else if (isObject(input)) {
+            configFromObject(config);
+        } else if (isNumber(input)) {
+            // from milliseconds
+            config._d = new Date(input);
+        } else {
+            hooks.createFromInputFallback(config);
+        }
+    }
+
+    function createLocalOrUTC(input, format, locale, strict, isUTC) {
+        var c = {};
+
+        if (format === true || format === false) {
+            strict = format;
+            format = undefined;
+        }
+
+        if (locale === true || locale === false) {
+            strict = locale;
+            locale = undefined;
+        }
+
+        if (
+            (isObject(input) && isObjectEmpty(input)) ||
+            (isArray(input) && input.length === 0)
+        ) {
+            input = undefined;
+        }
+        // object construction must be done this way.
+        // https://github.com/moment/moment/issues/1423
+        c._isAMomentObject = true;
+        c._useUTC = c._isUTC = isUTC;
+        c._l = locale;
+        c._i = input;
+        c._f = format;
+        c._strict = strict;
+
+        return createFromConfig(c);
+    }
+
+    function createLocal(input, format, locale, strict) {
+        return createLocalOrUTC(input, format, locale, strict, false);
+    }
+
+    var prototypeMin = deprecate(
+            'moment().min is deprecated, use moment.max instead. http://momentjs.com/guides/#/warnings/min-max/',
+            function () {
+                var other = createLocal.apply(null, arguments);
+                if (this.isValid() && other.isValid()) {
+                    return other < this ? this : other;
+                } else {
+                    return createInvalid();
+                }
+            }
+        ),
+        prototypeMax = deprecate(
+            'moment().max is deprecated, use moment.min instead. http://momentjs.com/guides/#/warnings/min-max/',
+            function () {
+                var other = createLocal.apply(null, arguments);
+                if (this.isValid() && other.isValid()) {
+                    return other > this ? this : other;
+                } else {
+                    return createInvalid();
+                }
+            }
+        );
+
+    // Pick a moment m from moments so that m[fn](other) is true for all
+    // other. This relies on the function fn to be transitive.
+    //
+    // moments should either be an array of moment objects or an array, whose
+    // first element is an array of moment objects.
+    function pickBy(fn, moments) {
+        var res, i;
+        if (moments.length === 1 && isArray(moments[0])) {
+            moments = moments[0];
+        }
+        if (!moments.length) {
+            return createLocal();
+        }
+        res = moments[0];
+        for (i = 1; i < moments.length; ++i) {
+            if (!moments[i].isValid() || moments[i][fn](res)) {
+                res = moments[i];
+            }
+        }
+        return res;
+    }
+
+    // TODO: Use [].sort instead?
+    function min() {
+        var args = [].slice.call(arguments, 0);
+
+        return pickBy('isBefore', args);
+    }
+
+    function max() {
+        var args = [].slice.call(arguments, 0);
+
+        return pickBy('isAfter', args);
+    }
+
+    var now = function () {
+        return Date.now ? Date.now() : +new Date();
+    };
+
+    var ordering = [
+        'year',
+        'quarter',
+        'month',
+        'week',
+        'day',
+        'hour',
+        'minute',
+        'second',
+        'millisecond',
+    ];
+
+    function isDurationValid(m) {
+        var key,
+            unitHasDecimal = false,
+            i;
+        for (key in m) {
+            if (
+                hasOwnProp(m, key) &&
+                !(
+                    indexOf.call(ordering, key) !== -1 &&
+                    (m[key] == null || !isNaN(m[key]))
+                )
+            ) {
+                return false;
+            }
+        }
+
+        for (i = 0; i < ordering.length; ++i) {
+            if (m[ordering[i]]) {
+                if (unitHasDecimal) {
+                    return false; // only allow non-integers for smallest unit
+                }
+                if (parseFloat(m[ordering[i]]) !== toInt(m[ordering[i]])) {
+                    unitHasDecimal = true;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    function isValid$1() {
+        return this._isValid;
+    }
+
+    function createInvalid$1() {
+        return createDuration(NaN);
+    }
+
+    function Duration(duration) {
+        var normalizedInput = normalizeObjectUnits(duration),
+            years = normalizedInput.year || 0,
+            quarters = normalizedInput.quarter || 0,
+            months = normalizedInput.month || 0,
+            weeks = normalizedInput.week || normalizedInput.isoWeek || 0,
+            days = normalizedInput.day || 0,
+            hours = normalizedInput.hour || 0,
+            minutes = normalizedInput.minute || 0,
+            seconds = normalizedInput.second || 0,
+            milliseconds = normalizedInput.millisecond || 0;
+
+        this._isValid = isDurationValid(normalizedInput);
+
+        // representation for dateAddRemove
+        this._milliseconds =
+            +milliseconds +
+            seconds * 1e3 + // 1000
+            minutes * 6e4 + // 1000 * 60
+            hours * 1000 * 60 * 60; //using 1000 * 60 * 60 instead of 36e5 to avoid floating point rounding errors https://github.com/moment/moment/issues/2978
+        // Because of dateAddRemove treats 24 hours as different from a
+        // day when working around DST, we need to store them separately
+        this._days = +days + weeks * 7;
+        // It is impossible to translate months into days without knowing
+        // which months you are are talking about, so we have to store
+        // it separately.
+        this._months = +months + quarters * 3 + years * 12;
+
+        this._data = {};
+
+        this._locale = getLocale();
+
+        this._bubble();
+    }
+
+    function isDuration(obj) {
+        return obj instanceof Duration;
+    }
+
+    function absRound(number) {
+        if (number < 0) {
+            return Math.round(-1 * number) * -1;
+        } else {
+            return Math.round(number);
+        }
+    }
+
+    // compare two arrays, return the number of differences
+    function compareArrays(array1, array2, dontConvert) {
+        var len = Math.min(array1.length, array2.length),
+            lengthDiff = Math.abs(array1.length - array2.length),
+            diffs = 0,
+            i;
+        for (i = 0; i < len; i++) {
+            if (
+                (dontConvert && array1[i] !== array2[i]) ||
+                (!dontConvert && toInt(array1[i]) !== toInt(array2[i]))
+            ) {
+                diffs++;
+            }
+        }
+        return diffs + lengthDiff;
+    }
+
+    // FORMATTING
+
+    function offset(token, separator) {
+        addFormatToken(token, 0, 0, function () {
+            var offset = this.utcOffset(),
+                sign = '+';
+            if (offset < 0) {
+                offset = -offset;
+                sign = '-';
+            }
+            return (
+                sign +
+                zeroFill(~~(offset / 60), 2) +
+                separator +
+                zeroFill(~~offset % 60, 2)
+            );
+        });
+    }
+
+    offset('Z', ':');
+    offset('ZZ', '');
+
+    // PARSING
+
+    addRegexToken('Z', matchShortOffset);
+    addRegexToken('ZZ', matchShortOffset);
+    addParseToken(['Z', 'ZZ'], function (input, array, config) {
+        config._useUTC = true;
+        config._tzm = offsetFromString(matchShortOffset, input);
+    });
+
+    // HELPERS
+
+    // timezone chunker
+    // '+10:00' > ['10',  '00']
+    // '-1530'  > ['-15', '30']
+    var chunkOffset = /([\+\-]|\d\d)/gi;
+
+    function offsetFromString(matcher, string) {
+        var matches = (string || '').match(matcher),
+            chunk,
+            parts,
+            minutes;
+
+        if (matches === null) {
+            return null;
+        }
+
+        chunk = matches[matches.length - 1] || [];
+        parts = (chunk + '').match(chunkOffset) || ['-', 0, 0];
+        minutes = +(parts[1] * 60) + toInt(parts[2]);
+
+        return minutes === 0 ? 0 : parts[0] === '+' ? minutes : -minutes;
+    }
+
+    // Return a moment from input, that is local/utc/zone equivalent to model.
+    function cloneWithOffset(input, model) {
+        var res, diff;
+        if (model._isUTC) {
+            res = model.clone();
+            diff =
+                (isMoment(input) || isDate(input)
+                    ? input.valueOf()
+                    : createLocal(input).valueOf()) - res.valueOf();
+            // Use low-level api, because this fn is low-level api.
+            res._d.setTime(res._d.valueOf() + diff);
+            hooks.updateOffset(res, false);
+            return res;
+        } else {
+            return createLocal(input).local();
+        }
+    }
+
+    function getDateOffset(m) {
+        // On Firefox.24 Date#getTimezoneOffset returns a floating point.
+        // https://github.com/moment/moment/pull/1871
+        return -Math.round(m._d.getTimezoneOffset());
+    }
+
+    // HOOKS
+
+    // This function will be called whenever a moment is mutated.
+    // It is intended to keep the offset in sync with the timezone.
+    hooks.updateOffset = function () {};
+
+    // MOMENTS
+
+    // keepLocalTime = true means only change the timezone, without
+    // affecting the local hour. So 5:31:26 +0300 --[utcOffset(2, true)]-->
+    // 5:31:26 +0200 It is possible that 5:31:26 doesn't exist with offset
+    // +0200, so we adjust the time as needed, to be valid.
+    //
+    // Keeping the time actually adds/subtracts (one hour)
+    // from the actual represented time. That is why we call updateOffset
+    // a second time. In case it wants us to change the offset again
+    // _changeInProgress == true case, then we have to adjust, because
+    // there is no such time in the given timezone.
+    function getSetOffset(input, keepLocalTime, keepMinutes) {
+        var offset = this._offset || 0,
+            localAdjust;
+        if (!this.isValid()) {
+            return input != null ? this : NaN;
+        }
+        if (input != null) {
+            if (typeof input === 'string') {
+                input = offsetFromString(matchShortOffset, input);
+                if (input === null) {
+                    return this;
+                }
+            } else if (Math.abs(input) < 16 && !keepMinutes) {
+                input = input * 60;
+            }
+            if (!this._isUTC && keepLocalTime) {
+                localAdjust = getDateOffset(this);
+            }
+            this._offset = input;
+            this._isUTC = true;
+            if (localAdjust != null) {
+                this.add(localAdjust, 'm');
+            }
+            if (offset !== input) {
+                if (!keepLocalTime || this._changeInProgress) {
+                    addSubtract(
+                        this,
+                        createDuration(input - offset, 'm'),
+                        1,
+                        false
+                    );
+                } else if (!this._changeInProgress) {
+                    this._changeInProgress = true;
+                    hooks.updateOffset(this, true);
+                    this._changeInProgress = null;
+                }
+            }
+            return this;
+        } else {
+            return this._isUTC ? offset : getDateOffset(this);
+        }
+    }
+
+    function getSetZone(input, keepLocalTime) {
+        if (input != null) {
+            if (typeof input !== 'string') {
+                input = -input;
+            }
+
+            this.utcOffset(input, keepLocalTime);
+
+            return this;
+        } else {
+            return -this.utcOffset();
+        }
+    }
+
+    function setOffsetToUTC(keepLocalTime) {
+        return this.utcOffset(0, keepLocalTime);
+    }
+
+    function setOffsetToLocal(keepLocalTime) {
+        if (this._isUTC) {
+            this.utcOffset(0, keepLocalTime);
+            this._isUTC = false;
+
+            if (keepLocalTime) {
+                this.subtract(getDateOffset(this), 'm');
+            }
+        }
+        return this;
+    }
+
+    function setOffsetToParsedOffset() {
+        if (this._tzm != null) {
+            this.utcOffset(this._tzm, false, true);
+        } else if (typeof this._i === 'string') {
+            var tZone = offsetFromString(matchOffset, this._i);
+            if (tZone != null) {
+                this.utcOffset(tZone);
+            } else {
+                this.utcOffset(0, true);
+            }
+        }
+        return this;
+    }
+
+    function hasAlignedHourOffset(input) {
+        if (!this.isValid()) {
+            return false;
+        }
+        input = input ? createLocal(input).utcOffset() : 0;
+
+        return (this.utcOffset() - input) % 60 === 0;
+    }
+
+    function isDaylightSavingTime() {
+        return (
+            this.utcOffset() > this.clone().month(0).utcOffset() ||
+            this.utcOffset() > this.clone().month(5).utcOffset()
+        );
+    }
+
+    function isDaylightSavingTimeShifted() {
+        if (!isUndefined(this._isDSTShifted)) {
+            return this._isDSTShifted;
+        }
+
+        var c = {},
+            other;
+
+        copyConfig(c, this);
+        c = prepareConfig(c);
+
+        if (c._a) {
+            other = c._isUTC ? createUTC(c._a) : createLocal(c._a);
+            this._isDSTShifted =
+                this.isValid() && compareArrays(c._a, other.toArray()) > 0;
+        } else {
+            this._isDSTShifted = false;
+        }
+
+        return this._isDSTShifted;
+    }
+
+    function isLocal() {
+        return this.isValid() ? !this._isUTC : false;
+    }
+
+    function isUtcOffset() {
+        return this.isValid() ? this._isUTC : false;
+    }
+
+    function isUtc() {
+        return this.isValid() ? this._isUTC && this._offset === 0 : false;
+    }
+
+    // ASP.NET json date format regex
+    var aspNetRegex = /^(-|\+)?(?:(\d*)[. ])?(\d+):(\d+)(?::(\d+)(\.\d*)?)?$/,
+        // from http://docs.closure-library.googlecode.com/git/closure_goog_date_date.js.source.html
+        // somewhat more in line with 4.4.3.2 2004 spec, but allows decimal anywhere
+        // and further modified to allow for strings containing both week and day
+        isoRegex = /^(-|\+)?P(?:([-+]?[0-9,.]*)Y)?(?:([-+]?[0-9,.]*)M)?(?:([-+]?[0-9,.]*)W)?(?:([-+]?[0-9,.]*)D)?(?:T(?:([-+]?[0-9,.]*)H)?(?:([-+]?[0-9,.]*)M)?(?:([-+]?[0-9,.]*)S)?)?$/;
+
+    function createDuration(input, key) {
+        var duration = input,
+            // matching against regexp is expensive, do it on demand
+            match = null,
+            sign,
+            ret,
+            diffRes;
+
+        if (isDuration(input)) {
+            duration = {
+                ms: input._milliseconds,
+                d: input._days,
+                M: input._months,
+            };
+        } else if (isNumber(input) || !isNaN(+input)) {
+            duration = {};
+            if (key) {
+                duration[key] = +input;
+            } else {
+                duration.milliseconds = +input;
+            }
+        } else if ((match = aspNetRegex.exec(input))) {
+            sign = match[1] === '-' ? -1 : 1;
+            duration = {
+                y: 0,
+                d: toInt(match[DATE]) * sign,
+                h: toInt(match[HOUR]) * sign,
+                m: toInt(match[MINUTE]) * sign,
+                s: toInt(match[SECOND]) * sign,
+                ms: toInt(absRound(match[MILLISECOND] * 1000)) * sign, // the millisecond decimal point is included in the match
+            };
+        } else if ((match = isoRegex.exec(input))) {
+            sign = match[1] === '-' ? -1 : 1;
+            duration = {
+                y: parseIso(match[2], sign),
+                M: parseIso(match[3], sign),
+                w: parseIso(match[4], sign),
+                d: parseIso(match[5], sign),
+                h: parseIso(match[6], sign),
+                m: parseIso(match[7], sign),
+                s: parseIso(match[8], sign),
+            };
+        } else if (duration == null) {
+            // checks for null or undefined
+            duration = {};
+        } else if (
+            typeof duration === 'object' &&
+            ('from' in duration || 'to' in duration)
+        ) {
+            diffRes = momentsDifference(
+                createLocal(duration.from),
+                createLocal(duration.to)
+            );
+
+            duration = {};
+            duration.ms = diffRes.milliseconds;
+            duration.M = diffRes.months;
+        }
+
+        ret = new Duration(duration);
+
+        if (isDuration(input) && hasOwnProp(input, '_locale')) {
+            ret._locale = input._locale;
+        }
+
+        if (isDuration(input) && hasOwnProp(input, '_isValid')) {
+            ret._isValid = input._isValid;
+        }
+
+        return ret;
+    }
+
+    createDuration.fn = Duration.prototype;
+    createDuration.invalid = createInvalid$1;
+
+    function parseIso(inp, sign) {
+        // We'd normally use ~~inp for this, but unfortunately it also
+        // converts floats to ints.
+        // inp may be undefined, so careful calling replace on it.
+        var res = inp && parseFloat(inp.replace(',', '.'));
+        // apply sign while we're at it
+        return (isNaN(res) ? 0 : res) * sign;
+    }
+
+    function positiveMomentsDifference(base, other) {
+        var res = {};
+
+        res.months =
+            other.month() - base.month() + (other.year() - base.year()) * 12;
+        if (base.clone().add(res.months, 'M').isAfter(other)) {
+            --res.months;
+        }
+
+        res.milliseconds = +other - +base.clone().add(res.months, 'M');
+
+        return res;
+    }
+
+    function momentsDifference(base, other) {
+        var res;
+        if (!(base.isValid() && other.isValid())) {
+            return { milliseconds: 0, months: 0 };
+        }
+
+        other = cloneWithOffset(other, base);
+        if (base.isBefore(other)) {
+            res = positiveMomentsDifference(base, other);
+        } else {
+            res = positiveMomentsDifference(other, base);
+            res.milliseconds = -res.milliseconds;
+            res.months = -res.months;
+        }
+
+        return res;
+    }
+
+    // TODO: remove 'name' arg after deprecation is removed
+    function createAdder(direction, name) {
+        return function (val, period) {
+            var dur, tmp;
+            //invert the arguments, but complain about it
+            if (period !== null && !isNaN(+period)) {
+                deprecateSimple(
+                    name,
+                    'moment().' +
+                        name +
+                        '(period, number) is deprecated. Please use moment().' +
+                        name +
+                        '(number, period). ' +
+                        'See http://momentjs.com/guides/#/warnings/add-inverted-param/ for more info.'
+                );
+                tmp = val;
+                val = period;
+                period = tmp;
+            }
+
+            dur = createDuration(val, period);
+            addSubtract(this, dur, direction);
+            return this;
+        };
+    }
+
+    function addSubtract(mom, duration, isAdding, updateOffset) {
+        var milliseconds = duration._milliseconds,
+            days = absRound(duration._days),
+            months = absRound(duration._months);
+
+        if (!mom.isValid()) {
+            // No op
+            return;
+        }
+
+        updateOffset = updateOffset == null ? true : updateOffset;
+
+        if (months) {
+            setMonth(mom, get(mom, 'Month') + months * isAdding);
+        }
+        if (days) {
+            set$1(mom, 'Date', get(mom, 'Date') + days * isAdding);
+        }
+        if (milliseconds) {
+            mom._d.setTime(mom._d.valueOf() + milliseconds * isAdding);
+        }
+        if (updateOffset) {
+            hooks.updateOffset(mom, days || months);
+        }
+    }
+
+    var add = createAdder(1, 'add'),
+        subtract = createAdder(-1, 'subtract');
+
+    function isString(input) {
+        return typeof input === 'string' || input instanceof String;
+    }
+
+    // type MomentInput = Moment | Date | string | number | (number | string)[] | MomentInputObject | void; // null | undefined
+    function isMomentInput(input) {
+        return (
+            isMoment(input) ||
+            isDate(input) ||
+            isString(input) ||
+            isNumber(input) ||
+            isNumberOrStringArray(input) ||
+            isMomentInputObject(input) ||
+            input === null ||
+            input === undefined
+        );
+    }
+
+    function isMomentInputObject(input) {
+        var objectTest = isObject(input) && !isObjectEmpty(input),
+            propertyTest = false,
+            properties = [
+                'years',
+                'year',
+                'y',
+                'months',
+                'month',
+                'M',
+                'days',
+                'day',
+                'd',
+                'dates',
+                'date',
+                'D',
+                'hours',
+                'hour',
+                'h',
+                'minutes',
+                'minute',
+                'm',
+                'seconds',
+                'second',
+                's',
+                'milliseconds',
+                'millisecond',
+                'ms',
+            ],
+            i,
+            property;
+
+        for (i = 0; i < properties.length; i += 1) {
+            property = properties[i];
+            propertyTest = propertyTest || hasOwnProp(input, property);
+        }
+
+        return objectTest && propertyTest;
+    }
+
+    function isNumberOrStringArray(input) {
+        var arrayTest = isArray(input),
+            dataTypeTest = false;
+        if (arrayTest) {
+            dataTypeTest =
+                input.filter(function (item) {
+                    return !isNumber(item) && isString(input);
+                }).length === 0;
+        }
+        return arrayTest && dataTypeTest;
+    }
+
+    function isCalendarSpec(input) {
+        var objectTest = isObject(input) && !isObjectEmpty(input),
+            propertyTest = false,
+            properties = [
+                'sameDay',
+                'nextDay',
+                'lastDay',
+                'nextWeek',
+                'lastWeek',
+                'sameElse',
+            ],
+            i,
+            property;
+
+        for (i = 0; i < properties.length; i += 1) {
+            property = properties[i];
+            propertyTest = propertyTest || hasOwnProp(input, property);
+        }
+
+        return objectTest && propertyTest;
+    }
+
+    function getCalendarFormat(myMoment, now) {
+        var diff = myMoment.diff(now, 'days', true);
+        return diff < -6
+            ? 'sameElse'
+            : diff < -1
+            ? 'lastWeek'
+            : diff < 0
+            ? 'lastDay'
+            : diff < 1
+            ? 'sameDay'
+            : diff < 2
+            ? 'nextDay'
+            : diff < 7
+            ? 'nextWeek'
+            : 'sameElse';
+    }
+
+    function calendar$1(time, formats) {
+        // Support for single parameter, formats only overload to the calendar function
+        if (arguments.length === 1) {
+            if (!arguments[0]) {
+                time = undefined;
+                formats = undefined;
+            } else if (isMomentInput(arguments[0])) {
+                time = arguments[0];
+                formats = undefined;
+            } else if (isCalendarSpec(arguments[0])) {
+                formats = arguments[0];
+                time = undefined;
+            }
+        }
+        // We want to compare the start of today, vs this.
+        // Getting start-of-today depends on whether we're local/utc/offset or not.
+        var now = time || createLocal(),
+            sod = cloneWithOffset(now, this).startOf('day'),
+            format = hooks.calendarFormat(this, sod) || 'sameElse',
+            output =
+                formats &&
+                (isFunction(formats[format])
+                    ? formats[format].call(this, now)
+                    : formats[format]);
+
+        return this.format(
+            output || this.localeData().calendar(format, this, createLocal(now))
+        );
+    }
+
+    function clone() {
+        return new Moment(this);
+    }
+
+    function isAfter(input, units) {
+        var localInput = isMoment(input) ? input : createLocal(input);
+        if (!(this.isValid() && localInput.isValid())) {
+            return false;
+        }
+        units = normalizeUnits(units) || 'millisecond';
+        if (units === 'millisecond') {
+            return this.valueOf() > localInput.valueOf();
+        } else {
+            return localInput.valueOf() < this.clone().startOf(units).valueOf();
+        }
+    }
+
+    function isBefore(input, units) {
+        var localInput = isMoment(input) ? input : createLocal(input);
+        if (!(this.isValid() && localInput.isValid())) {
+            return false;
+        }
+        units = normalizeUnits(units) || 'millisecond';
+        if (units === 'millisecond') {
+            return this.valueOf() < localInput.valueOf();
+        } else {
+            return this.clone().endOf(units).valueOf() < localInput.valueOf();
+        }
+    }
+
+    function isBetween(from, to, units, inclusivity) {
+        var localFrom = isMoment(from) ? from : createLocal(from),
+            localTo = isMoment(to) ? to : createLocal(to);
+        if (!(this.isValid() && localFrom.isValid() && localTo.isValid())) {
+            return false;
+        }
+        inclusivity = inclusivity || '()';
+        return (
+            (inclusivity[0] === '('
+                ? this.isAfter(localFrom, units)
+                : !this.isBefore(localFrom, units)) &&
+            (inclusivity[1] === ')'
+                ? this.isBefore(localTo, units)
+                : !this.isAfter(localTo, units))
+        );
+    }
+
+    function isSame(input, units) {
+        var localInput = isMoment(input) ? input : createLocal(input),
+            inputMs;
+        if (!(this.isValid() && localInput.isValid())) {
+            return false;
+        }
+        units = normalizeUnits(units) || 'millisecond';
+        if (units === 'millisecond') {
+            return this.valueOf() === localInput.valueOf();
+        } else {
+            inputMs = localInput.valueOf();
+            return (
+                this.clone().startOf(units).valueOf() <= inputMs &&
+                inputMs <= this.clone().endOf(units).valueOf()
+            );
+        }
+    }
+
+    function isSameOrAfter(input, units) {
+        return this.isSame(input, units) || this.isAfter(input, units);
+    }
+
+    function isSameOrBefore(input, units) {
+        return this.isSame(input, units) || this.isBefore(input, units);
+    }
+
+    function diff(input, units, asFloat) {
+        var that, zoneDelta, output;
+
+        if (!this.isValid()) {
+            return NaN;
+        }
+
+        that = cloneWithOffset(input, this);
+
+        if (!that.isValid()) {
+            return NaN;
+        }
+
+        zoneDelta = (that.utcOffset() - this.utcOffset()) * 6e4;
+
+        units = normalizeUnits(units);
+
+        switch (units) {
+            case 'year':
+                output = monthDiff(this, that) / 12;
+                break;
+            case 'month':
+                output = monthDiff(this, that);
+                break;
+            case 'quarter':
+                output = monthDiff(this, that) / 3;
+                break;
+            case 'second':
+                output = (this - that) / 1e3;
+                break; // 1000
+            case 'minute':
+                output = (this - that) / 6e4;
+                break; // 1000 * 60
+            case 'hour':
+                output = (this - that) / 36e5;
+                break; // 1000 * 60 * 60
+            case 'day':
+                output = (this - that - zoneDelta) / 864e5;
+                break; // 1000 * 60 * 60 * 24, negate dst
+            case 'week':
+                output = (this - that - zoneDelta) / 6048e5;
+                break; // 1000 * 60 * 60 * 24 * 7, negate dst
+            default:
+                output = this - that;
+        }
+
+        return asFloat ? output : absFloor(output);
+    }
+
+    function monthDiff(a, b) {
+        if (a.date() < b.date()) {
+            // end-of-month calculations work correct when the start month has more
+            // days than the end month.
+            return -monthDiff(b, a);
+        }
+        // difference in months
+        var wholeMonthDiff = (b.year() - a.year()) * 12 + (b.month() - a.month()),
+            // b is in (anchor - 1 month, anchor + 1 month)
+            anchor = a.clone().add(wholeMonthDiff, 'months'),
+            anchor2,
+            adjust;
+
+        if (b - anchor < 0) {
+            anchor2 = a.clone().add(wholeMonthDiff - 1, 'months');
+            // linear across the month
+            adjust = (b - anchor) / (anchor - anchor2);
+        } else {
+            anchor2 = a.clone().add(wholeMonthDiff + 1, 'months');
+            // linear across the month
+            adjust = (b - anchor) / (anchor2 - anchor);
+        }
+
+        //check for negative zero, return zero if negative zero
+        return -(wholeMonthDiff + adjust) || 0;
+    }
+
+    hooks.defaultFormat = 'YYYY-MM-DDTHH:mm:ssZ';
+    hooks.defaultFormatUtc = 'YYYY-MM-DDTHH:mm:ss[Z]';
+
+    function toString() {
+        return this.clone().locale('en').format('ddd MMM DD YYYY HH:mm:ss [GMT]ZZ');
+    }
+
+    function toISOString(keepOffset) {
+        if (!this.isValid()) {
+            return null;
+        }
+        var utc = keepOffset !== true,
+            m = utc ? this.clone().utc() : this;
+        if (m.year() < 0 || m.year() > 9999) {
+            return formatMoment(
+                m,
+                utc
+                    ? 'YYYYYY-MM-DD[T]HH:mm:ss.SSS[Z]'
+                    : 'YYYYYY-MM-DD[T]HH:mm:ss.SSSZ'
+            );
+        }
+        if (isFunction(Date.prototype.toISOString)) {
+            // native implementation is ~50x faster, use it when we can
+            if (utc) {
+                return this.toDate().toISOString();
+            } else {
+                return new Date(this.valueOf() + this.utcOffset() * 60 * 1000)
+                    .toISOString()
+                    .replace('Z', formatMoment(m, 'Z'));
+            }
+        }
+        return formatMoment(
+            m,
+            utc ? 'YYYY-MM-DD[T]HH:mm:ss.SSS[Z]' : 'YYYY-MM-DD[T]HH:mm:ss.SSSZ'
+        );
+    }
+
+    /**
+     * Return a human readable representation of a moment that can
+     * also be evaluated to get a new moment which is the same
+     *
+     * @link https://nodejs.org/dist/latest/docs/api/util.html#util_custom_inspect_function_on_objects
+     */
+    function inspect() {
+        if (!this.isValid()) {
+            return 'moment.invalid(/* ' + this._i + ' */)';
+        }
+        var func = 'moment',
+            zone = '',
+            prefix,
+            year,
+            datetime,
+            suffix;
+        if (!this.isLocal()) {
+            func = this.utcOffset() === 0 ? 'moment.utc' : 'moment.parseZone';
+            zone = 'Z';
+        }
+        prefix = '[' + func + '("]';
+        year = 0 <= this.year() && this.year() <= 9999 ? 'YYYY' : 'YYYYYY';
+        datetime = '-MM-DD[T]HH:mm:ss.SSS';
+        suffix = zone + '[")]';
+
+        return this.format(prefix + year + datetime + suffix);
+    }
+
+    function format(inputString) {
+        if (!inputString) {
+            inputString = this.isUtc()
+                ? hooks.defaultFormatUtc
+                : hooks.defaultFormat;
+        }
+        var output = formatMoment(this, inputString);
+        return this.localeData().postformat(output);
+    }
+
+    function from(time, withoutSuffix) {
+        if (
+            this.isValid() &&
+            ((isMoment(time) && time.isValid()) || createLocal(time).isValid())
+        ) {
+            return createDuration({ to: this, from: time })
+                .locale(this.locale())
+                .humanize(!withoutSuffix);
+        } else {
+            return this.localeData().invalidDate();
+        }
+    }
+
+    function fromNow(withoutSuffix) {
+        return this.from(createLocal(), withoutSuffix);
+    }
+
+    function to(time, withoutSuffix) {
+        if (
+            this.isValid() &&
+            ((isMoment(time) && time.isValid()) || createLocal(time).isValid())
+        ) {
+            return createDuration({ from: this, to: time })
+                .locale(this.locale())
+                .humanize(!withoutSuffix);
+        } else {
+            return this.localeData().invalidDate();
+        }
+    }
+
+    function toNow(withoutSuffix) {
+        return this.to(createLocal(), withoutSuffix);
+    }
+
+    // If passed a locale key, it will set the locale for this
+    // instance.  Otherwise, it will return the locale configuration
+    // variables for this instance.
+    function locale(key) {
+        var newLocaleData;
+
+        if (key === undefined) {
+            return this._locale._abbr;
+        } else {
+            newLocaleData = getLocale(key);
+            if (newLocaleData != null) {
+                this._locale = newLocaleData;
+            }
+            return this;
+        }
+    }
+
+    var lang = deprecate(
+        'moment().lang() is deprecated. Instead, use moment().localeData() to get the language configuration. Use moment().locale() to change languages.',
+        function (key) {
+            if (key === undefined) {
+                return this.localeData();
+            } else {
+                return this.locale(key);
+            }
+        }
+    );
+
+    function localeData() {
+        return this._locale;
+    }
+
+    var MS_PER_SECOND = 1000,
+        MS_PER_MINUTE = 60 * MS_PER_SECOND,
+        MS_PER_HOUR = 60 * MS_PER_MINUTE,
+        MS_PER_400_YEARS = (365 * 400 + 97) * 24 * MS_PER_HOUR;
+
+    // actual modulo - handles negative numbers (for dates before 1970):
+    function mod$1(dividend, divisor) {
+        return ((dividend % divisor) + divisor) % divisor;
+    }
+
+    function localStartOfDate(y, m, d) {
+        // the date constructor remaps years 0-99 to 1900-1999
+        if (y < 100 && y >= 0) {
+            // preserve leap years using a full 400 year cycle, then reset
+            return new Date(y + 400, m, d) - MS_PER_400_YEARS;
+        } else {
+            return new Date(y, m, d).valueOf();
+        }
+    }
+
+    function utcStartOfDate(y, m, d) {
+        // Date.UTC remaps years 0-99 to 1900-1999
+        if (y < 100 && y >= 0) {
+            // preserve leap years using a full 400 year cycle, then reset
+            return Date.UTC(y + 400, m, d) - MS_PER_400_YEARS;
+        } else {
+            return Date.UTC(y, m, d);
+        }
+    }
+
+    function startOf(units) {
+        var time, startOfDate;
+        units = normalizeUnits(units);
+        if (units === undefined || units === 'millisecond' || !this.isValid()) {
+            return this;
+        }
+
+        startOfDate = this._isUTC ? utcStartOfDate : localStartOfDate;
+
+        switch (units) {
+            case 'year':
+                time = startOfDate(this.year(), 0, 1);
+                break;
+            case 'quarter':
+                time = startOfDate(
+                    this.year(),
+                    this.month() - (this.month() % 3),
+                    1
+                );
+                break;
+            case 'month':
+                time = startOfDate(this.year(), this.month(), 1);
+                break;
+            case 'week':
+                time = startOfDate(
+                    this.year(),
+                    this.month(),
+                    this.date() - this.weekday()
+                );
+                break;
+            case 'isoWeek':
+                time = startOfDate(
+                    this.year(),
+                    this.month(),
+                    this.date() - (this.isoWeekday() - 1)
+                );
+                break;
+            case 'day':
+            case 'date':
+                time = startOfDate(this.year(), this.month(), this.date());
+                break;
+            case 'hour':
+                time = this._d.valueOf();
+                time -= mod$1(
+                    time + (this._isUTC ? 0 : this.utcOffset() * MS_PER_MINUTE),
+                    MS_PER_HOUR
+                );
+                break;
+            case 'minute':
+                time = this._d.valueOf();
+                time -= mod$1(time, MS_PER_MINUTE);
+                break;
+            case 'second':
+                time = this._d.valueOf();
+                time -= mod$1(time, MS_PER_SECOND);
+                break;
+        }
+
+        this._d.setTime(time);
+        hooks.updateOffset(this, true);
+        return this;
+    }
+
+    function endOf(units) {
+        var time, startOfDate;
+        units = normalizeUnits(units);
+        if (units === undefined || units === 'millisecond' || !this.isValid()) {
+            return this;
+        }
+
+        startOfDate = this._isUTC ? utcStartOfDate : localStartOfDate;
+
+        switch (units) {
+            case 'year':
+                time = startOfDate(this.year() + 1, 0, 1) - 1;
+                break;
+            case 'quarter':
+                time =
+                    startOfDate(
+                        this.year(),
+                        this.month() - (this.month() % 3) + 3,
+                        1
+                    ) - 1;
+                break;
+            case 'month':
+                time = startOfDate(this.year(), this.month() + 1, 1) - 1;
+                break;
+            case 'week':
+                time =
+                    startOfDate(
+                        this.year(),
+                        this.month(),
+                        this.date() - this.weekday() + 7
+                    ) - 1;
+                break;
+            case 'isoWeek':
+                time =
+                    startOfDate(
+                        this.year(),
+                        this.month(),
+                        this.date() - (this.isoWeekday() - 1) + 7
+                    ) - 1;
+                break;
+            case 'day':
+            case 'date':
+                time = startOfDate(this.year(), this.month(), this.date() + 1) - 1;
+                break;
+            case 'hour':
+                time = this._d.valueOf();
+                time +=
+                    MS_PER_HOUR -
+                    mod$1(
+                        time + (this._isUTC ? 0 : this.utcOffset() * MS_PER_MINUTE),
+                        MS_PER_HOUR
+                    ) -
+                    1;
+                break;
+            case 'minute':
+                time = this._d.valueOf();
+                time += MS_PER_MINUTE - mod$1(time, MS_PER_MINUTE) - 1;
+                break;
+            case 'second':
+                time = this._d.valueOf();
+                time += MS_PER_SECOND - mod$1(time, MS_PER_SECOND) - 1;
+                break;
+        }
+
+        this._d.setTime(time);
+        hooks.updateOffset(this, true);
+        return this;
+    }
+
+    function valueOf() {
+        return this._d.valueOf() - (this._offset || 0) * 60000;
+    }
+
+    function unix() {
+        return Math.floor(this.valueOf() / 1000);
+    }
+
+    function toDate() {
+        return new Date(this.valueOf());
+    }
+
+    function toArray() {
+        var m = this;
+        return [
+            m.year(),
+            m.month(),
+            m.date(),
+            m.hour(),
+            m.minute(),
+            m.second(),
+            m.millisecond(),
+        ];
+    }
+
+    function toObject() {
+        var m = this;
+        return {
+            years: m.year(),
+            months: m.month(),
+            date: m.date(),
+            hours: m.hours(),
+            minutes: m.minutes(),
+            seconds: m.seconds(),
+            milliseconds: m.milliseconds(),
+        };
+    }
+
+    function toJSON() {
+        // new Date(NaN).toJSON() === null
+        return this.isValid() ? this.toISOString() : null;
+    }
+
+    function isValid$2() {
+        return isValid(this);
+    }
+
+    function parsingFlags() {
+        return extend({}, getParsingFlags(this));
+    }
+
+    function invalidAt() {
+        return getParsingFlags(this).overflow;
+    }
+
+    function creationData() {
+        return {
+            input: this._i,
+            format: this._f,
+            locale: this._locale,
+            isUTC: this._isUTC,
+            strict: this._strict,
+        };
+    }
+
+    addFormatToken('N', 0, 0, 'eraAbbr');
+    addFormatToken('NN', 0, 0, 'eraAbbr');
+    addFormatToken('NNN', 0, 0, 'eraAbbr');
+    addFormatToken('NNNN', 0, 0, 'eraName');
+    addFormatToken('NNNNN', 0, 0, 'eraNarrow');
+
+    addFormatToken('y', ['y', 1], 'yo', 'eraYear');
+    addFormatToken('y', ['yy', 2], 0, 'eraYear');
+    addFormatToken('y', ['yyy', 3], 0, 'eraYear');
+    addFormatToken('y', ['yyyy', 4], 0, 'eraYear');
+
+    addRegexToken('N', matchEraAbbr);
+    addRegexToken('NN', matchEraAbbr);
+    addRegexToken('NNN', matchEraAbbr);
+    addRegexToken('NNNN', matchEraName);
+    addRegexToken('NNNNN', matchEraNarrow);
+
+    addParseToken(['N', 'NN', 'NNN', 'NNNN', 'NNNNN'], function (
+        input,
+        array,
+        config,
+        token
+    ) {
+        var era = config._locale.erasParse(input, token, config._strict);
+        if (era) {
+            getParsingFlags(config).era = era;
+        } else {
+            getParsingFlags(config).invalidEra = input;
+        }
+    });
+
+    addRegexToken('y', matchUnsigned);
+    addRegexToken('yy', matchUnsigned);
+    addRegexToken('yyy', matchUnsigned);
+    addRegexToken('yyyy', matchUnsigned);
+    addRegexToken('yo', matchEraYearOrdinal);
+
+    addParseToken(['y', 'yy', 'yyy', 'yyyy'], YEAR);
+    addParseToken(['yo'], function (input, array, config, token) {
+        var match;
+        if (config._locale._eraYearOrdinalRegex) {
+            match = input.match(config._locale._eraYearOrdinalRegex);
+        }
+
+        if (config._locale.eraYearOrdinalParse) {
+            array[YEAR] = config._locale.eraYearOrdinalParse(input, match);
+        } else {
+            array[YEAR] = parseInt(input, 10);
+        }
+    });
+
+    function localeEras(m, format) {
+        var i,
+            l,
+            date,
+            eras = this._eras || getLocale('en')._eras;
+        for (i = 0, l = eras.length; i < l; ++i) {
+            switch (typeof eras[i].since) {
+                case 'string':
+                    // truncate time
+                    date = hooks(eras[i].since).startOf('day');
+                    eras[i].since = date.valueOf();
+                    break;
+            }
+
+            switch (typeof eras[i].until) {
+                case 'undefined':
+                    eras[i].until = +Infinity;
+                    break;
+                case 'string':
+                    // truncate time
+                    date = hooks(eras[i].until).startOf('day').valueOf();
+                    eras[i].until = date.valueOf();
+                    break;
+            }
+        }
+        return eras;
+    }
+
+    function localeErasParse(eraName, format, strict) {
+        var i,
+            l,
+            eras = this.eras(),
+            name,
+            abbr,
+            narrow;
+        eraName = eraName.toUpperCase();
+
+        for (i = 0, l = eras.length; i < l; ++i) {
+            name = eras[i].name.toUpperCase();
+            abbr = eras[i].abbr.toUpperCase();
+            narrow = eras[i].narrow.toUpperCase();
+
+            if (strict) {
+                switch (format) {
+                    case 'N':
+                    case 'NN':
+                    case 'NNN':
+                        if (abbr === eraName) {
+                            return eras[i];
+                        }
+                        break;
+
+                    case 'NNNN':
+                        if (name === eraName) {
+                            return eras[i];
+                        }
+                        break;
+
+                    case 'NNNNN':
+                        if (narrow === eraName) {
+                            return eras[i];
+                        }
+                        break;
+                }
+            } else if ([name, abbr, narrow].indexOf(eraName) >= 0) {
+                return eras[i];
+            }
+        }
+    }
+
+    function localeErasConvertYear(era, year) {
+        var dir = era.since <= era.until ? +1 : -1;
+        if (year === undefined) {
+            return hooks(era.since).year();
+        } else {
+            return hooks(era.since).year() + (year - era.offset) * dir;
+        }
+    }
+
+    function getEraName() {
+        var i,
+            l,
+            val,
+            eras = this.localeData().eras();
+        for (i = 0, l = eras.length; i < l; ++i) {
+            // truncate time
+            val = this.clone().startOf('day').valueOf();
+
+            if (eras[i].since <= val && val <= eras[i].until) {
+                return eras[i].name;
+            }
+            if (eras[i].until <= val && val <= eras[i].since) {
+                return eras[i].name;
+            }
+        }
+
+        return '';
+    }
+
+    function getEraNarrow() {
+        var i,
+            l,
+            val,
+            eras = this.localeData().eras();
+        for (i = 0, l = eras.length; i < l; ++i) {
+            // truncate time
+            val = this.clone().startOf('day').valueOf();
+
+            if (eras[i].since <= val && val <= eras[i].until) {
+                return eras[i].narrow;
+            }
+            if (eras[i].until <= val && val <= eras[i].since) {
+                return eras[i].narrow;
+            }
+        }
+
+        return '';
+    }
+
+    function getEraAbbr() {
+        var i,
+            l,
+            val,
+            eras = this.localeData().eras();
+        for (i = 0, l = eras.length; i < l; ++i) {
+            // truncate time
+            val = this.clone().startOf('day').valueOf();
+
+            if (eras[i].since <= val && val <= eras[i].until) {
+                return eras[i].abbr;
+            }
+            if (eras[i].until <= val && val <= eras[i].since) {
+                return eras[i].abbr;
+            }
+        }
+
+        return '';
+    }
+
+    function getEraYear() {
+        var i,
+            l,
+            dir,
+            val,
+            eras = this.localeData().eras();
+        for (i = 0, l = eras.length; i < l; ++i) {
+            dir = eras[i].since <= eras[i].until ? +1 : -1;
+
+            // truncate time
+            val = this.clone().startOf('day').valueOf();
+
+            if (
+                (eras[i].since <= val && val <= eras[i].until) ||
+                (eras[i].until <= val && val <= eras[i].since)
+            ) {
+                return (
+                    (this.year() - hooks(eras[i].since).year()) * dir +
+                    eras[i].offset
+                );
+            }
+        }
+
+        return this.year();
+    }
+
+    function erasNameRegex(isStrict) {
+        if (!hasOwnProp(this, '_erasNameRegex')) {
+            computeErasParse.call(this);
+        }
+        return isStrict ? this._erasNameRegex : this._erasRegex;
+    }
+
+    function erasAbbrRegex(isStrict) {
+        if (!hasOwnProp(this, '_erasAbbrRegex')) {
+            computeErasParse.call(this);
+        }
+        return isStrict ? this._erasAbbrRegex : this._erasRegex;
+    }
+
+    function erasNarrowRegex(isStrict) {
+        if (!hasOwnProp(this, '_erasNarrowRegex')) {
+            computeErasParse.call(this);
+        }
+        return isStrict ? this._erasNarrowRegex : this._erasRegex;
+    }
+
+    function matchEraAbbr(isStrict, locale) {
+        return locale.erasAbbrRegex(isStrict);
+    }
+
+    function matchEraName(isStrict, locale) {
+        return locale.erasNameRegex(isStrict);
+    }
+
+    function matchEraNarrow(isStrict, locale) {
+        return locale.erasNarrowRegex(isStrict);
+    }
+
+    function matchEraYearOrdinal(isStrict, locale) {
+        return locale._eraYearOrdinalRegex || matchUnsigned;
+    }
+
+    function computeErasParse() {
+        var abbrPieces = [],
+            namePieces = [],
+            narrowPieces = [],
+            mixedPieces = [],
+            i,
+            l,
+            eras = this.eras();
+
+        for (i = 0, l = eras.length; i < l; ++i) {
+            namePieces.push(regexEscape(eras[i].name));
+            abbrPieces.push(regexEscape(eras[i].abbr));
+            narrowPieces.push(regexEscape(eras[i].narrow));
+
+            mixedPieces.push(regexEscape(eras[i].name));
+            mixedPieces.push(regexEscape(eras[i].abbr));
+            mixedPieces.push(regexEscape(eras[i].narrow));
+        }
+
+        this._erasRegex = new RegExp('^(' + mixedPieces.join('|') + ')', 'i');
+        this._erasNameRegex = new RegExp('^(' + namePieces.join('|') + ')', 'i');
+        this._erasAbbrRegex = new RegExp('^(' + abbrPieces.join('|') + ')', 'i');
+        this._erasNarrowRegex = new RegExp(
+            '^(' + narrowPieces.join('|') + ')',
+            'i'
+        );
+    }
+
+    // FORMATTING
+
+    addFormatToken(0, ['gg', 2], 0, function () {
+        return this.weekYear() % 100;
+    });
+
+    addFormatToken(0, ['GG', 2], 0, function () {
+        return this.isoWeekYear() % 100;
+    });
+
+    function addWeekYearFormatToken(token, getter) {
+        addFormatToken(0, [token, token.length], 0, getter);
+    }
+
+    addWeekYearFormatToken('gggg', 'weekYear');
+    addWeekYearFormatToken('ggggg', 'weekYear');
+    addWeekYearFormatToken('GGGG', 'isoWeekYear');
+    addWeekYearFormatToken('GGGGG', 'isoWeekYear');
+
+    // ALIASES
+
+    addUnitAlias('weekYear', 'gg');
+    addUnitAlias('isoWeekYear', 'GG');
+
+    // PRIORITY
+
+    addUnitPriority('weekYear', 1);
+    addUnitPriority('isoWeekYear', 1);
+
+    // PARSING
+
+    addRegexToken('G', matchSigned);
+    addRegexToken('g', matchSigned);
+    addRegexToken('GG', match1to2, match2);
+    addRegexToken('gg', match1to2, match2);
+    addRegexToken('GGGG', match1to4, match4);
+    addRegexToken('gggg', match1to4, match4);
+    addRegexToken('GGGGG', match1to6, match6);
+    addRegexToken('ggggg', match1to6, match6);
+
+    addWeekParseToken(['gggg', 'ggggg', 'GGGG', 'GGGGG'], function (
+        input,
+        week,
+        config,
+        token
+    ) {
+        week[token.substr(0, 2)] = toInt(input);
+    });
+
+    addWeekParseToken(['gg', 'GG'], function (input, week, config, token) {
+        week[token] = hooks.parseTwoDigitYear(input);
+    });
+
+    // MOMENTS
+
+    function getSetWeekYear(input) {
+        return getSetWeekYearHelper.call(
+            this,
+            input,
+            this.week(),
+            this.weekday(),
+            this.localeData()._week.dow,
+            this.localeData()._week.doy
+        );
+    }
+
+    function getSetISOWeekYear(input) {
+        return getSetWeekYearHelper.call(
+            this,
+            input,
+            this.isoWeek(),
+            this.isoWeekday(),
+            1,
+            4
+        );
+    }
+
+    function getISOWeeksInYear() {
+        return weeksInYear(this.year(), 1, 4);
+    }
+
+    function getISOWeeksInISOWeekYear() {
+        return weeksInYear(this.isoWeekYear(), 1, 4);
+    }
+
+    function getWeeksInYear() {
+        var weekInfo = this.localeData()._week;
+        return weeksInYear(this.year(), weekInfo.dow, weekInfo.doy);
+    }
+
+    function getWeeksInWeekYear() {
+        var weekInfo = this.localeData()._week;
+        return weeksInYear(this.weekYear(), weekInfo.dow, weekInfo.doy);
+    }
+
+    function getSetWeekYearHelper(input, week, weekday, dow, doy) {
+        var weeksTarget;
+        if (input == null) {
+            return weekOfYear(this, dow, doy).year;
+        } else {
+            weeksTarget = weeksInYear(input, dow, doy);
+            if (week > weeksTarget) {
+                week = weeksTarget;
+            }
+            return setWeekAll.call(this, input, week, weekday, dow, doy);
+        }
+    }
+
+    function setWeekAll(weekYear, week, weekday, dow, doy) {
+        var dayOfYearData = dayOfYearFromWeeks(weekYear, week, weekday, dow, doy),
+            date = createUTCDate(dayOfYearData.year, 0, dayOfYearData.dayOfYear);
+
+        this.year(date.getUTCFullYear());
+        this.month(date.getUTCMonth());
+        this.date(date.getUTCDate());
+        return this;
+    }
+
+    // FORMATTING
+
+    addFormatToken('Q', 0, 'Qo', 'quarter');
+
+    // ALIASES
+
+    addUnitAlias('quarter', 'Q');
+
+    // PRIORITY
+
+    addUnitPriority('quarter', 7);
+
+    // PARSING
+
+    addRegexToken('Q', match1);
+    addParseToken('Q', function (input, array) {
+        array[MONTH] = (toInt(input) - 1) * 3;
+    });
+
+    // MOMENTS
+
+    function getSetQuarter(input) {
+        return input == null
+            ? Math.ceil((this.month() + 1) / 3)
+            : this.month((input - 1) * 3 + (this.month() % 3));
+    }
+
+    // FORMATTING
+
+    addFormatToken('D', ['DD', 2], 'Do', 'date');
+
+    // ALIASES
+
+    addUnitAlias('date', 'D');
+
+    // PRIORITY
+    addUnitPriority('date', 9);
+
+    // PARSING
+
+    addRegexToken('D', match1to2);
+    addRegexToken('DD', match1to2, match2);
+    addRegexToken('Do', function (isStrict, locale) {
+        // TODO: Remove "ordinalParse" fallback in next major release.
+        return isStrict
+            ? locale._dayOfMonthOrdinalParse || locale._ordinalParse
+            : locale._dayOfMonthOrdinalParseLenient;
+    });
+
+    addParseToken(['D', 'DD'], DATE);
+    addParseToken('Do', function (input, array) {
+        array[DATE] = toInt(input.match(match1to2)[0]);
+    });
+
+    // MOMENTS
+
+    var getSetDayOfMonth = makeGetSet('Date', true);
+
+    // FORMATTING
+
+    addFormatToken('DDD', ['DDDD', 3], 'DDDo', 'dayOfYear');
+
+    // ALIASES
+
+    addUnitAlias('dayOfYear', 'DDD');
+
+    // PRIORITY
+    addUnitPriority('dayOfYear', 4);
+
+    // PARSING
+
+    addRegexToken('DDD', match1to3);
+    addRegexToken('DDDD', match3);
+    addParseToken(['DDD', 'DDDD'], function (input, array, config) {
+        config._dayOfYear = toInt(input);
+    });
+
+    // HELPERS
+
+    // MOMENTS
+
+    function getSetDayOfYear(input) {
+        var dayOfYear =
+            Math.round(
+                (this.clone().startOf('day') - this.clone().startOf('year')) / 864e5
+            ) + 1;
+        return input == null ? dayOfYear : this.add(input - dayOfYear, 'd');
+    }
+
+    // FORMATTING
+
+    addFormatToken('m', ['mm', 2], 0, 'minute');
+
+    // ALIASES
+
+    addUnitAlias('minute', 'm');
+
+    // PRIORITY
+
+    addUnitPriority('minute', 14);
+
+    // PARSING
+
+    addRegexToken('m', match1to2);
+    addRegexToken('mm', match1to2, match2);
+    addParseToken(['m', 'mm'], MINUTE);
+
+    // MOMENTS
+
+    var getSetMinute = makeGetSet('Minutes', false);
+
+    // FORMATTING
+
+    addFormatToken('s', ['ss', 2], 0, 'second');
+
+    // ALIASES
+
+    addUnitAlias('second', 's');
+
+    // PRIORITY
+
+    addUnitPriority('second', 15);
+
+    // PARSING
+
+    addRegexToken('s', match1to2);
+    addRegexToken('ss', match1to2, match2);
+    addParseToken(['s', 'ss'], SECOND);
+
+    // MOMENTS
+
+    var getSetSecond = makeGetSet('Seconds', false);
+
+    // FORMATTING
+
+    addFormatToken('S', 0, 0, function () {
+        return ~~(this.millisecond() / 100);
+    });
+
+    addFormatToken(0, ['SS', 2], 0, function () {
+        return ~~(this.millisecond() / 10);
+    });
+
+    addFormatToken(0, ['SSS', 3], 0, 'millisecond');
+    addFormatToken(0, ['SSSS', 4], 0, function () {
+        return this.millisecond() * 10;
+    });
+    addFormatToken(0, ['SSSSS', 5], 0, function () {
+        return this.millisecond() * 100;
+    });
+    addFormatToken(0, ['SSSSSS', 6], 0, function () {
+        return this.millisecond() * 1000;
+    });
+    addFormatToken(0, ['SSSSSSS', 7], 0, function () {
+        return this.millisecond() * 10000;
+    });
+    addFormatToken(0, ['SSSSSSSS', 8], 0, function () {
+        return this.millisecond() * 100000;
+    });
+    addFormatToken(0, ['SSSSSSSSS', 9], 0, function () {
+        return this.millisecond() * 1000000;
+    });
+
+    // ALIASES
+
+    addUnitAlias('millisecond', 'ms');
+
+    // PRIORITY
+
+    addUnitPriority('millisecond', 16);
+
+    // PARSING
+
+    addRegexToken('S', match1to3, match1);
+    addRegexToken('SS', match1to3, match2);
+    addRegexToken('SSS', match1to3, match3);
+
+    var token, getSetMillisecond;
+    for (token = 'SSSS'; token.length <= 9; token += 'S') {
+        addRegexToken(token, matchUnsigned);
+    }
+
+    function parseMs(input, array) {
+        array[MILLISECOND] = toInt(('0.' + input) * 1000);
+    }
+
+    for (token = 'S'; token.length <= 9; token += 'S') {
+        addParseToken(token, parseMs);
+    }
+
+    getSetMillisecond = makeGetSet('Milliseconds', false);
+
+    // FORMATTING
+
+    addFormatToken('z', 0, 0, 'zoneAbbr');
+    addFormatToken('zz', 0, 0, 'zoneName');
+
+    // MOMENTS
+
+    function getZoneAbbr() {
+        return this._isUTC ? 'UTC' : '';
+    }
+
+    function getZoneName() {
+        return this._isUTC ? 'Coordinated Universal Time' : '';
+    }
+
+    var proto = Moment.prototype;
+
+    proto.add = add;
+    proto.calendar = calendar$1;
+    proto.clone = clone;
+    proto.diff = diff;
+    proto.endOf = endOf;
+    proto.format = format;
+    proto.from = from;
+    proto.fromNow = fromNow;
+    proto.to = to;
+    proto.toNow = toNow;
+    proto.get = stringGet;
+    proto.invalidAt = invalidAt;
+    proto.isAfter = isAfter;
+    proto.isBefore = isBefore;
+    proto.isBetween = isBetween;
+    proto.isSame = isSame;
+    proto.isSameOrAfter = isSameOrAfter;
+    proto.isSameOrBefore = isSameOrBefore;
+    proto.isValid = isValid$2;
+    proto.lang = lang;
+    proto.locale = locale;
+    proto.localeData = localeData;
+    proto.max = prototypeMax;
+    proto.min = prototypeMin;
+    proto.parsingFlags = parsingFlags;
+    proto.set = stringSet;
+    proto.startOf = startOf;
+    proto.subtract = subtract;
+    proto.toArray = toArray;
+    proto.toObject = toObject;
+    proto.toDate = toDate;
+    proto.toISOString = toISOString;
+    proto.inspect = inspect;
+    if (typeof Symbol !== 'undefined' && Symbol.for != null) {
+        proto[Symbol.for('nodejs.util.inspect.custom')] = function () {
+            return 'Moment<' + this.format() + '>';
+        };
+    }
+    proto.toJSON = toJSON;
+    proto.toString = toString;
+    proto.unix = unix;
+    proto.valueOf = valueOf;
+    proto.creationData = creationData;
+    proto.eraName = getEraName;
+    proto.eraNarrow = getEraNarrow;
+    proto.eraAbbr = getEraAbbr;
+    proto.eraYear = getEraYear;
+    proto.year = getSetYear;
+    proto.isLeapYear = getIsLeapYear;
+    proto.weekYear = getSetWeekYear;
+    proto.isoWeekYear = getSetISOWeekYear;
+    proto.quarter = proto.quarters = getSetQuarter;
+    proto.month = getSetMonth;
+    proto.daysInMonth = getDaysInMonth;
+    proto.week = proto.weeks = getSetWeek;
+    proto.isoWeek = proto.isoWeeks = getSetISOWeek;
+    proto.weeksInYear = getWeeksInYear;
+    proto.weeksInWeekYear = getWeeksInWeekYear;
+    proto.isoWeeksInYear = getISOWeeksInYear;
+    proto.isoWeeksInISOWeekYear = getISOWeeksInISOWeekYear;
+    proto.date = getSetDayOfMonth;
+    proto.day = proto.days = getSetDayOfWeek;
+    proto.weekday = getSetLocaleDayOfWeek;
+    proto.isoWeekday = getSetISODayOfWeek;
+    proto.dayOfYear = getSetDayOfYear;
+    proto.hour = proto.hours = getSetHour;
+    proto.minute = proto.minutes = getSetMinute;
+    proto.second = proto.seconds = getSetSecond;
+    proto.millisecond = proto.milliseconds = getSetMillisecond;
+    proto.utcOffset = getSetOffset;
+    proto.utc = setOffsetToUTC;
+    proto.local = setOffsetToLocal;
+    proto.parseZone = setOffsetToParsedOffset;
+    proto.hasAlignedHourOffset = hasAlignedHourOffset;
+    proto.isDST = isDaylightSavingTime;
+    proto.isLocal = isLocal;
+    proto.isUtcOffset = isUtcOffset;
+    proto.isUtc = isUtc;
+    proto.isUTC = isUtc;
+    proto.zoneAbbr = getZoneAbbr;
+    proto.zoneName = getZoneName;
+    proto.dates = deprecate(
+        'dates accessor is deprecated. Use date instead.',
+        getSetDayOfMonth
+    );
+    proto.months = deprecate(
+        'months accessor is deprecated. Use month instead',
+        getSetMonth
+    );
+    proto.years = deprecate(
+        'years accessor is deprecated. Use year instead',
+        getSetYear
+    );
+    proto.zone = deprecate(
+        'moment().zone is deprecated, use moment().utcOffset instead. http://momentjs.com/guides/#/warnings/zone/',
+        getSetZone
+    );
+    proto.isDSTShifted = deprecate(
+        'isDSTShifted is deprecated. See http://momentjs.com/guides/#/warnings/dst-shifted/ for more information',
+        isDaylightSavingTimeShifted
+    );
+
+    function createUnix(input) {
+        return createLocal(input * 1000);
+    }
+
+    function createInZone() {
+        return createLocal.apply(null, arguments).parseZone();
+    }
+
+    function preParsePostFormat(string) {
+        return string;
+    }
+
+    var proto$1 = Locale.prototype;
+
+    proto$1.calendar = calendar;
+    proto$1.longDateFormat = longDateFormat;
+    proto$1.invalidDate = invalidDate;
+    proto$1.ordinal = ordinal;
+    proto$1.preparse = preParsePostFormat;
+    proto$1.postformat = preParsePostFormat;
+    proto$1.relativeTime = relativeTime;
+    proto$1.pastFuture = pastFuture;
+    proto$1.set = set;
+    proto$1.eras = localeEras;
+    proto$1.erasParse = localeErasParse;
+    proto$1.erasConvertYear = localeErasConvertYear;
+    proto$1.erasAbbrRegex = erasAbbrRegex;
+    proto$1.erasNameRegex = erasNameRegex;
+    proto$1.erasNarrowRegex = erasNarrowRegex;
+
+    proto$1.months = localeMonths;
+    proto$1.monthsShort = localeMonthsShort;
+    proto$1.monthsParse = localeMonthsParse;
+    proto$1.monthsRegex = monthsRegex;
+    proto$1.monthsShortRegex = monthsShortRegex;
+    proto$1.week = localeWeek;
+    proto$1.firstDayOfYear = localeFirstDayOfYear;
+    proto$1.firstDayOfWeek = localeFirstDayOfWeek;
+
+    proto$1.weekdays = localeWeekdays;
+    proto$1.weekdaysMin = localeWeekdaysMin;
+    proto$1.weekdaysShort = localeWeekdaysShort;
+    proto$1.weekdaysParse = localeWeekdaysParse;
+
+    proto$1.weekdaysRegex = weekdaysRegex;
+    proto$1.weekdaysShortRegex = weekdaysShortRegex;
+    proto$1.weekdaysMinRegex = weekdaysMinRegex;
+
+    proto$1.isPM = localeIsPM;
+    proto$1.meridiem = localeMeridiem;
+
+    function get$1(format, index, field, setter) {
+        var locale = getLocale(),
+            utc = createUTC().set(setter, index);
+        return locale[field](utc, format);
+    }
+
+    function listMonthsImpl(format, index, field) {
+        if (isNumber(format)) {
+            index = format;
+            format = undefined;
+        }
+
+        format = format || '';
+
+        if (index != null) {
+            return get$1(format, index, field, 'month');
+        }
+
+        var i,
+            out = [];
+        for (i = 0; i < 12; i++) {
+            out[i] = get$1(format, i, field, 'month');
+        }
+        return out;
+    }
+
+    // ()
+    // (5)
+    // (fmt, 5)
+    // (fmt)
+    // (true)
+    // (true, 5)
+    // (true, fmt, 5)
+    // (true, fmt)
+    function listWeekdaysImpl(localeSorted, format, index, field) {
+        if (typeof localeSorted === 'boolean') {
+            if (isNumber(format)) {
+                index = format;
+                format = undefined;
+            }
+
+            format = format || '';
+        } else {
+            format = localeSorted;
+            index = format;
+            localeSorted = false;
+
+            if (isNumber(format)) {
+                index = format;
+                format = undefined;
+            }
+
+            format = format || '';
+        }
+
+        var locale = getLocale(),
+            shift = localeSorted ? locale._week.dow : 0,
+            i,
+            out = [];
+
+        if (index != null) {
+            return get$1(format, (index + shift) % 7, field, 'day');
+        }
+
+        for (i = 0; i < 7; i++) {
+            out[i] = get$1(format, (i + shift) % 7, field, 'day');
+        }
+        return out;
+    }
+
+    function listMonths(format, index) {
+        return listMonthsImpl(format, index, 'months');
+    }
+
+    function listMonthsShort(format, index) {
+        return listMonthsImpl(format, index, 'monthsShort');
+    }
+
+    function listWeekdays(localeSorted, format, index) {
+        return listWeekdaysImpl(localeSorted, format, index, 'weekdays');
+    }
+
+    function listWeekdaysShort(localeSorted, format, index) {
+        return listWeekdaysImpl(localeSorted, format, index, 'weekdaysShort');
+    }
+
+    function listWeekdaysMin(localeSorted, format, index) {
+        return listWeekdaysImpl(localeSorted, format, index, 'weekdaysMin');
+    }
+
+    getSetGlobalLocale('en', {
+        eras: [
+            {
+                since: '0001-01-01',
+                until: +Infinity,
+                offset: 1,
+                name: 'Anno Domini',
+                narrow: 'AD',
+                abbr: 'AD',
+            },
+            {
+                since: '0000-12-31',
+                until: -Infinity,
+                offset: 1,
+                name: 'Before Christ',
+                narrow: 'BC',
+                abbr: 'BC',
+            },
+        ],
+        dayOfMonthOrdinalParse: /\d{1,2}(th|st|nd|rd)/,
+        ordinal: function (number) {
+            var b = number % 10,
+                output =
+                    toInt((number % 100) / 10) === 1
+                        ? 'th'
+                        : b === 1
+                        ? 'st'
+                        : b === 2
+                        ? 'nd'
+                        : b === 3
+                        ? 'rd'
+                        : 'th';
+            return number + output;
+        },
+    });
+
+    // Side effect imports
+
+    hooks.lang = deprecate(
+        'moment.lang is deprecated. Use moment.locale instead.',
+        getSetGlobalLocale
+    );
+    hooks.langData = deprecate(
+        'moment.langData is deprecated. Use moment.localeData instead.',
+        getLocale
+    );
+
+    var mathAbs = Math.abs;
+
+    function abs() {
+        var data = this._data;
+
+        this._milliseconds = mathAbs(this._milliseconds);
+        this._days = mathAbs(this._days);
+        this._months = mathAbs(this._months);
+
+        data.milliseconds = mathAbs(data.milliseconds);
+        data.seconds = mathAbs(data.seconds);
+        data.minutes = mathAbs(data.minutes);
+        data.hours = mathAbs(data.hours);
+        data.months = mathAbs(data.months);
+        data.years = mathAbs(data.years);
+
+        return this;
+    }
+
+    function addSubtract$1(duration, input, value, direction) {
+        var other = createDuration(input, value);
+
+        duration._milliseconds += direction * other._milliseconds;
+        duration._days += direction * other._days;
+        duration._months += direction * other._months;
+
+        return duration._bubble();
+    }
+
+    // supports only 2.0-style add(1, 's') or add(duration)
+    function add$1(input, value) {
+        return addSubtract$1(this, input, value, 1);
+    }
+
+    // supports only 2.0-style subtract(1, 's') or subtract(duration)
+    function subtract$1(input, value) {
+        return addSubtract$1(this, input, value, -1);
+    }
+
+    function absCeil(number) {
+        if (number < 0) {
+            return Math.floor(number);
+        } else {
+            return Math.ceil(number);
+        }
+    }
+
+    function bubble() {
+        var milliseconds = this._milliseconds,
+            days = this._days,
+            months = this._months,
+            data = this._data,
+            seconds,
+            minutes,
+            hours,
+            years,
+            monthsFromDays;
+
+        // if we have a mix of positive and negative values, bubble down first
+        // check: https://github.com/moment/moment/issues/2166
+        if (
+            !(
+                (milliseconds >= 0 && days >= 0 && months >= 0) ||
+                (milliseconds <= 0 && days <= 0 && months <= 0)
+            )
+        ) {
+            milliseconds += absCeil(monthsToDays(months) + days) * 864e5;
+            days = 0;
+            months = 0;
+        }
+
+        // The following code bubbles up values, see the tests for
+        // examples of what that means.
+        data.milliseconds = milliseconds % 1000;
+
+        seconds = absFloor(milliseconds / 1000);
+        data.seconds = seconds % 60;
+
+        minutes = absFloor(seconds / 60);
+        data.minutes = minutes % 60;
+
+        hours = absFloor(minutes / 60);
+        data.hours = hours % 24;
+
+        days += absFloor(hours / 24);
+
+        // convert days to months
+        monthsFromDays = absFloor(daysToMonths(days));
+        months += monthsFromDays;
+        days -= absCeil(monthsToDays(monthsFromDays));
+
+        // 12 months -> 1 year
+        years = absFloor(months / 12);
+        months %= 12;
+
+        data.days = days;
+        data.months = months;
+        data.years = years;
+
+        return this;
+    }
+
+    function daysToMonths(days) {
+        // 400 years have 146097 days (taking into account leap year rules)
+        // 400 years have 12 months === 4800
+        return (days * 4800) / 146097;
+    }
+
+    function monthsToDays(months) {
+        // the reverse of daysToMonths
+        return (months * 146097) / 4800;
+    }
+
+    function as(units) {
+        if (!this.isValid()) {
+            return NaN;
+        }
+        var days,
+            months,
+            milliseconds = this._milliseconds;
+
+        units = normalizeUnits(units);
+
+        if (units === 'month' || units === 'quarter' || units === 'year') {
+            days = this._days + milliseconds / 864e5;
+            months = this._months + daysToMonths(days);
+            switch (units) {
+                case 'month':
+                    return months;
+                case 'quarter':
+                    return months / 3;
+                case 'year':
+                    return months / 12;
+            }
+        } else {
+            // handle milliseconds separately because of floating point math errors (issue #1867)
+            days = this._days + Math.round(monthsToDays(this._months));
+            switch (units) {
+                case 'week':
+                    return days / 7 + milliseconds / 6048e5;
+                case 'day':
+                    return days + milliseconds / 864e5;
+                case 'hour':
+                    return days * 24 + milliseconds / 36e5;
+                case 'minute':
+                    return days * 1440 + milliseconds / 6e4;
+                case 'second':
+                    return days * 86400 + milliseconds / 1000;
+                // Math.floor prevents floating point math errors here
+                case 'millisecond':
+                    return Math.floor(days * 864e5) + milliseconds;
+                default:
+                    throw new Error('Unknown unit ' + units);
+            }
+        }
+    }
+
+    // TODO: Use this.as('ms')?
+    function valueOf$1() {
+        if (!this.isValid()) {
+            return NaN;
+        }
+        return (
+            this._milliseconds +
+            this._days * 864e5 +
+            (this._months % 12) * 2592e6 +
+            toInt(this._months / 12) * 31536e6
+        );
+    }
+
+    function makeAs(alias) {
+        return function () {
+            return this.as(alias);
+        };
+    }
+
+    var asMilliseconds = makeAs('ms'),
+        asSeconds = makeAs('s'),
+        asMinutes = makeAs('m'),
+        asHours = makeAs('h'),
+        asDays = makeAs('d'),
+        asWeeks = makeAs('w'),
+        asMonths = makeAs('M'),
+        asQuarters = makeAs('Q'),
+        asYears = makeAs('y');
+
+    function clone$1() {
+        return createDuration(this);
+    }
+
+    function get$2(units) {
+        units = normalizeUnits(units);
+        return this.isValid() ? this[units + 's']() : NaN;
+    }
+
+    function makeGetter(name) {
+        return function () {
+            return this.isValid() ? this._data[name] : NaN;
+        };
+    }
+
+    var milliseconds = makeGetter('milliseconds'),
+        seconds = makeGetter('seconds'),
+        minutes = makeGetter('minutes'),
+        hours = makeGetter('hours'),
+        days = makeGetter('days'),
+        months = makeGetter('months'),
+        years = makeGetter('years');
+
+    function weeks() {
+        return absFloor(this.days() / 7);
+    }
+
+    var round = Math.round,
+        thresholds = {
+            ss: 44, // a few seconds to seconds
+            s: 45, // seconds to minute
+            m: 45, // minutes to hour
+            h: 22, // hours to day
+            d: 26, // days to month/week
+            w: null, // weeks to month
+            M: 11, // months to year
+        };
+
+    // helper function for moment.fn.from, moment.fn.fromNow, and moment.duration.fn.humanize
+    function substituteTimeAgo(string, number, withoutSuffix, isFuture, locale) {
+        return locale.relativeTime(number || 1, !!withoutSuffix, string, isFuture);
+    }
+
+    function relativeTime$1(posNegDuration, withoutSuffix, thresholds, locale) {
+        var duration = createDuration(posNegDuration).abs(),
+            seconds = round(duration.as('s')),
+            minutes = round(duration.as('m')),
+            hours = round(duration.as('h')),
+            days = round(duration.as('d')),
+            months = round(duration.as('M')),
+            weeks = round(duration.as('w')),
+            years = round(duration.as('y')),
+            a =
+                (seconds <= thresholds.ss && ['s', seconds]) ||
+                (seconds < thresholds.s && ['ss', seconds]) ||
+                (minutes <= 1 && ['m']) ||
+                (minutes < thresholds.m && ['mm', minutes]) ||
+                (hours <= 1 && ['h']) ||
+                (hours < thresholds.h && ['hh', hours]) ||
+                (days <= 1 && ['d']) ||
+                (days < thresholds.d && ['dd', days]);
+
+        if (thresholds.w != null) {
+            a =
+                a ||
+                (weeks <= 1 && ['w']) ||
+                (weeks < thresholds.w && ['ww', weeks]);
+        }
+        a = a ||
+            (months <= 1 && ['M']) ||
+            (months < thresholds.M && ['MM', months]) ||
+            (years <= 1 && ['y']) || ['yy', years];
+
+        a[2] = withoutSuffix;
+        a[3] = +posNegDuration > 0;
+        a[4] = locale;
+        return substituteTimeAgo.apply(null, a);
+    }
+
+    // This function allows you to set the rounding function for relative time strings
+    function getSetRelativeTimeRounding(roundingFunction) {
+        if (roundingFunction === undefined) {
+            return round;
+        }
+        if (typeof roundingFunction === 'function') {
+            round = roundingFunction;
+            return true;
+        }
+        return false;
+    }
+
+    // This function allows you to set a threshold for relative time strings
+    function getSetRelativeTimeThreshold(threshold, limit) {
+        if (thresholds[threshold] === undefined) {
+            return false;
+        }
+        if (limit === undefined) {
+            return thresholds[threshold];
+        }
+        thresholds[threshold] = limit;
+        if (threshold === 's') {
+            thresholds.ss = limit - 1;
+        }
+        return true;
+    }
+
+    function humanize(argWithSuffix, argThresholds) {
+        if (!this.isValid()) {
+            return this.localeData().invalidDate();
+        }
+
+        var withSuffix = false,
+            th = thresholds,
+            locale,
+            output;
+
+        if (typeof argWithSuffix === 'object') {
+            argThresholds = argWithSuffix;
+            argWithSuffix = false;
+        }
+        if (typeof argWithSuffix === 'boolean') {
+            withSuffix = argWithSuffix;
+        }
+        if (typeof argThresholds === 'object') {
+            th = Object.assign({}, thresholds, argThresholds);
+            if (argThresholds.s != null && argThresholds.ss == null) {
+                th.ss = argThresholds.s - 1;
+            }
+        }
+
+        locale = this.localeData();
+        output = relativeTime$1(this, !withSuffix, th, locale);
+
+        if (withSuffix) {
+            output = locale.pastFuture(+this, output);
+        }
+
+        return locale.postformat(output);
+    }
+
+    var abs$1 = Math.abs;
+
+    function sign(x) {
+        return (x > 0) - (x < 0) || +x;
+    }
+
+    function toISOString$1() {
+        // for ISO strings we do not use the normal bubbling rules:
+        //  * milliseconds bubble up until they become hours
+        //  * days do not bubble at all
+        //  * months bubble up until they become years
+        // This is because there is no context-free conversion between hours and days
+        // (think of clock changes)
+        // and also not between days and months (28-31 days per month)
+        if (!this.isValid()) {
+            return this.localeData().invalidDate();
+        }
+
+        var seconds = abs$1(this._milliseconds) / 1000,
+            days = abs$1(this._days),
+            months = abs$1(this._months),
+            minutes,
+            hours,
+            years,
+            s,
+            total = this.asSeconds(),
+            totalSign,
+            ymSign,
+            daysSign,
+            hmsSign;
+
+        if (!total) {
+            // this is the same as C#'s (Noda) and python (isodate)...
+            // but not other JS (goog.date)
+            return 'P0D';
+        }
+
+        // 3600 seconds -> 60 minutes -> 1 hour
+        minutes = absFloor(seconds / 60);
+        hours = absFloor(minutes / 60);
+        seconds %= 60;
+        minutes %= 60;
+
+        // 12 months -> 1 year
+        years = absFloor(months / 12);
+        months %= 12;
+
+        // inspired by https://github.com/dordille/moment-isoduration/blob/master/moment.isoduration.js
+        s = seconds ? seconds.toFixed(3).replace(/\.?0+$/, '') : '';
+
+        totalSign = total < 0 ? '-' : '';
+        ymSign = sign(this._months) !== sign(total) ? '-' : '';
+        daysSign = sign(this._days) !== sign(total) ? '-' : '';
+        hmsSign = sign(this._milliseconds) !== sign(total) ? '-' : '';
+
+        return (
+            totalSign +
+            'P' +
+            (years ? ymSign + years + 'Y' : '') +
+            (months ? ymSign + months + 'M' : '') +
+            (days ? daysSign + days + 'D' : '') +
+            (hours || minutes || seconds ? 'T' : '') +
+            (hours ? hmsSign + hours + 'H' : '') +
+            (minutes ? hmsSign + minutes + 'M' : '') +
+            (seconds ? hmsSign + s + 'S' : '')
+        );
+    }
+
+    var proto$2 = Duration.prototype;
+
+    proto$2.isValid = isValid$1;
+    proto$2.abs = abs;
+    proto$2.add = add$1;
+    proto$2.subtract = subtract$1;
+    proto$2.as = as;
+    proto$2.asMilliseconds = asMilliseconds;
+    proto$2.asSeconds = asSeconds;
+    proto$2.asMinutes = asMinutes;
+    proto$2.asHours = asHours;
+    proto$2.asDays = asDays;
+    proto$2.asWeeks = asWeeks;
+    proto$2.asMonths = asMonths;
+    proto$2.asQuarters = asQuarters;
+    proto$2.asYears = asYears;
+    proto$2.valueOf = valueOf$1;
+    proto$2._bubble = bubble;
+    proto$2.clone = clone$1;
+    proto$2.get = get$2;
+    proto$2.milliseconds = milliseconds;
+    proto$2.seconds = seconds;
+    proto$2.minutes = minutes;
+    proto$2.hours = hours;
+    proto$2.days = days;
+    proto$2.weeks = weeks;
+    proto$2.months = months;
+    proto$2.years = years;
+    proto$2.humanize = humanize;
+    proto$2.toISOString = toISOString$1;
+    proto$2.toString = toISOString$1;
+    proto$2.toJSON = toISOString$1;
+    proto$2.locale = locale;
+    proto$2.localeData = localeData;
+
+    proto$2.toIsoString = deprecate(
+        'toIsoString() is deprecated. Please use toISOString() instead (notice the capitals)',
+        toISOString$1
+    );
+    proto$2.lang = lang;
+
+    // FORMATTING
+
+    addFormatToken('X', 0, 0, 'unix');
+    addFormatToken('x', 0, 0, 'valueOf');
+
+    // PARSING
+
+    addRegexToken('x', matchSigned);
+    addRegexToken('X', matchTimestamp);
+    addParseToken('X', function (input, array, config) {
+        config._d = new Date(parseFloat(input) * 1000);
+    });
+    addParseToken('x', function (input, array, config) {
+        config._d = new Date(toInt(input));
+    });
+
+    //! moment.js
+
+    hooks.version = '2.29.1';
+
+    setHookCallback(createLocal);
+
+    hooks.fn = proto;
+    hooks.min = min;
+    hooks.max = max;
+    hooks.now = now;
+    hooks.utc = createUTC;
+    hooks.unix = createUnix;
+    hooks.months = listMonths;
+    hooks.isDate = isDate;
+    hooks.locale = getSetGlobalLocale;
+    hooks.invalid = createInvalid;
+    hooks.duration = createDuration;
+    hooks.isMoment = isMoment;
+    hooks.weekdays = listWeekdays;
+    hooks.parseZone = createInZone;
+    hooks.localeData = getLocale;
+    hooks.isDuration = isDuration;
+    hooks.monthsShort = listMonthsShort;
+    hooks.weekdaysMin = listWeekdaysMin;
+    hooks.defineLocale = defineLocale;
+    hooks.updateLocale = updateLocale;
+    hooks.locales = listLocales;
+    hooks.weekdaysShort = listWeekdaysShort;
+    hooks.normalizeUnits = normalizeUnits;
+    hooks.relativeTimeRounding = getSetRelativeTimeRounding;
+    hooks.relativeTimeThreshold = getSetRelativeTimeThreshold;
+    hooks.calendarFormat = getCalendarFormat;
+    hooks.prototype = proto;
+
+    // currently HTML5 input type only supports 24-hour formats
+    hooks.HTML5_FMT = {
+        DATETIME_LOCAL: 'YYYY-MM-DDTHH:mm', // <input type="datetime-local" />
+        DATETIME_LOCAL_SECONDS: 'YYYY-MM-DDTHH:mm:ss', // <input type="datetime-local" step="1" />
+        DATETIME_LOCAL_MS: 'YYYY-MM-DDTHH:mm:ss.SSS', // <input type="datetime-local" step="0.001" />
+        DATE: 'YYYY-MM-DD', // <input type="date" />
+        TIME: 'HH:mm', // <input type="time" />
+        TIME_SECONDS: 'HH:mm:ss', // <input type="time" step="1" />
+        TIME_MS: 'HH:mm:ss.SSS', // <input type="time" step="0.001" />
+        WEEK: 'GGGG-[W]WW', // <input type="week" />
+        MONTH: 'YYYY-MM', // <input type="month" />
+    };
+
+    return hooks;
+
+})));
+
+},{}],14:[function(require,module,exports){
 (function (global){
 /**!
  * @fileOverview Kickass library to create and place poppers near their reference elements.
@@ -18292,4 +26299,4 @@ return Popper;
 
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}]},{},[3]);
+},{}]},{},[7]);

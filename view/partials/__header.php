@@ -1,9 +1,11 @@
 <?php
 session_start();
-//create site directory
-$directory = "C:/xampp/htdocs/likesfora/";
+//call site directory
+$directory = "c:/xampp/htdocs/likesfora/";
 //include config file
 include "{$directory}config/config.php";
+//call the likes class to display total likes at the top
+include "{$directory}classes/Likes.php";
 //retrieve all user details
 isset($_GET['id']) ? $id = $_GET['id'] : $id = '';
 isset($_SESSION['userid']) ? $userid = $_SESSION['userid'] : $userid = $id;

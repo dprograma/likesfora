@@ -20,7 +20,7 @@ if ($loggedin == 1 || $registered == 1) {
                             <table class="table p-3" width="80%">
 
                                 <?php
-                                $sql = "SELECT * FROM notifications WHERE `userid` = ?";
+                                $sql = "SELECT * FROM notifications WHERE `userid` = ? ORDER BY `datecreated` DESC";
                                 $stmt = $mysqli->prepare($sql);
                                 $stmt->bind_param('i', $userid);
                                 $stmt->execute();

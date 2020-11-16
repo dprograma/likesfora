@@ -4,6 +4,7 @@ session_start();
 $directory = "C:/xampp/htdocs/likesfora/";
 //include config file
 include "{$directory}config/config.php";
+include "{$directory}classes/Likes.php";
 //retrieve all user details
 if (isset($_GET['id'])) {
     $userid = $_GET['id'];

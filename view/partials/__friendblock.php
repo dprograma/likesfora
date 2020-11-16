@@ -22,6 +22,7 @@
               <img src="../assets/images/likes2.png" alt="your likes" class="imgboard mr-3">Your Likes
             </p>
             <p class="indicatortext">View your likes history</p>
+            <div class="likesnum"><?php $likes = new Likes(); echo $totallikes = $likes->showlikes($userid); ?></div>
           </div>
         </div>
         <div class="col-md-6 col-6">

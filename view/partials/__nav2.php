@@ -34,15 +34,16 @@
       ?>">
         <a class="nav-link" href="http://localhost/likesfora/view/home.php"><i class="fas fa-home"></i> Home</a>
       </li>
-      <li class="nav-item 
-      <?php if (basename($_SERVER['SCRIPT_NAME']) === 'groups.php') {
-        echo 'active';
-      } else {
-        echo '';
-      }
-      ?>">
-        <a class="nav-link" href="#"><i class="fas fa-users"></i> Group</a>
-      </li>
+      <!-- <li class="nav-item  -->
+      <?php //if (basename($_SERVER['SCRIPT_NAME']) === 'groups.php') {
+       // echo 'active';
+      //} else {
+      //  echo '';
+     //}
+      ?>
+      <!-- "> -->
+        <!-- <a class="nav-link" href="#"><i class="fas fa-users"></i> Group</a> -->
+      <!-- </li> -->
       <li class="nav-item dropdown 
       <?php if (basename($_SERVER['SCRIPT_NAME']) === 'post.php|story.php|event.php') {
         echo 'active';
@@ -76,16 +77,16 @@
         <a class="nav-link" href="../view/notifications.php" title="Notification"><i class="fas fa-bell"></i> Notification</a>
       </li>
       <li>
-        <a href="#" class="nav-link 
-        <?php if (basename($_SERVER['SCRIPT_NAME']) === 'videos.php') {
+        <a href="#" id="videocall" class="nav-link 
+        <?php if (basename($_SERVER['SCRIPT_NAME']) === 'videocall.php') {
           echo 'active';
         } else {
           echo '';
         }
         ?>" title="Video"><i class="fas fa-video" aria-hidden="true"></i> Video</a>
-      </li>
+      </li>'
       <li>
-        <a href="#" class="nav-link 
+        <a href="#" id="audiocall" class="nav-link 
         <?php if (basename($_SERVER['SCRIPT_NAME']) === 'audios.php') {
           echo 'active';
         } else {
@@ -93,7 +94,11 @@
         }
         ?>" title="Audio"><i class="fa fa-audio-description" aria-hidden="true"></i> Audio</a>
       </li>
+      <li>
+        <a href="#" class="nav-link" title="Your Total Likes"><img src="../assets/images/likes2.png" class="likesimage"></a>
+      </li>
     </ul>
+    <div class="toptotallikes"><?php $likes = new Likes(); echo $totallikes = $likes->showlikes($userid); ?></div>
     <div class="form-group has-search my-2 my-lg-0">
       <span class="fa fa-search form-control-feedback"></span>
       <input type="search" class="form-control searchbg text-sm" placeholder="Looking for?">

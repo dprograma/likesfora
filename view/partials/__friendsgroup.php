@@ -1,5 +1,5 @@
 <div class="card p-3 <?php echo $margin; ?> customshadow">
-    <div class="card-text" style="font-size: 1rem;font-weight: bold;">Friends . <span style="font-size: 13px;color:rgba(0, 0, 0, 0.6)">1,294</span></div>
+    <div class="card-text" style="font-size: 1rem;font-weight: bold;">Friends . <span style="font-size: 13px;color:rgba(0, 0, 0, 0.6)"><?php echo $friends; ?></span></div>
     <hr />
     <div class="row p-2">
         <div class="col-md-4 col-4">
@@ -53,6 +53,6 @@
         </div>
     </div>
     <div class="row justify-content-center">
-        <a href="../view/friends.php" class="text-decoration-none">See All Friends</a>
+        <a href="../view/friendlist.php" class="text-decoration-none">See All Friends</a>
     </div>
 </div>
